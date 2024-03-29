@@ -63,7 +63,7 @@ def on_message(client, userdata, msg):
 
     handler = protocols.get(mp.decoded.portnum)
     if handler is None:
-        print("nothing came from protocols")
+        print(f"{prefix} no handler came from protocols")
         return
 
     if handler.protobufFactory is None:
