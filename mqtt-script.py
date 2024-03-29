@@ -31,7 +31,7 @@ def on_message(client, userdata, msg):
 
     handler = protocols.get(mp.decoded.portnum)
     if handler is None:
-        print("nothing came from protocols, or not protobuf")
+        print("nothing came from protocols")
         return
 
     from_id = getattr(mp, 'from')
