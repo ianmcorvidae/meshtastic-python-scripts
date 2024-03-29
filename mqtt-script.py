@@ -1,9 +1,27 @@
 import paho.mqtt.client as mqtt
 import sys
-from meshtastic import mqtt_pb2, portnums_pb2, protocols, BROADCAST_NUM
+from meshtastic import mqtt_pb2, portnums_pb2, mesh_pb2, protocols, BROADCAST_NUM
 from google.protobuf.json_format import MessageToJson
 
+import base64
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+
 root_topic = 'msh'
+default_key = "1PG7OiApB1nwvP+rz05pAQ=="
+
+# with thanks to pdxlocs
+def try_decode(mp):
+    key_bytes = base64.b64decode(default_key.encode('ascii'))
+
+    nonce = getattr(mp, "id").to_bytes(8, "little") + getattr(mp, "from").to_bytes(8, "little")
+    cipher = Cipher(algorithms.AES(key_bytes), modes.CTR(nonce), backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_bytes = decryptor.update(getattr(mp, "encrypted")) + decryptor.finalize()
+
+    data = mesh_pb2.Data()
+    data.ParseFromString(decrypted_bytes)
+    mp.decoded.CopyFrom(data)
 
 def on_connect(client, userdata, flags, reason_code, properties):
     global root_topic
@@ -22,16 +40,7 @@ def on_message(client, userdata, msg):
         se.ParseFromString(msg.payload)
         mp = se.packet
     except Exception as e:
-        print(f"err parsing service envelope: {str(e)}")
-        return
-
-    if mp.HasField("encrypted") and not mp.HasField("decoded"):
-        print("encrypted, not continuing")
-        return
-
-    handler = protocols.get(mp.decoded.portnum)
-    if handler is None:
-        print("nothing came from protocols")
+        print(f"ERROR: parsing service envelope: {str(e)}")
         return
 
     from_id = getattr(mp, 'from')
@@ -42,13 +51,28 @@ def on_message(client, userdata, msg):
         to_id = f"{to_id:x}"
 
     pn = portnums_pb2.PortNum.Name(mp.decoded.portnum)
+
+    prefix = f"{mp.channel} [{from_id:x}->{to_id}] {pn}:"
+    if mp.HasField("encrypted") and not mp.HasField("decoded"):
+        try:
+            try_decode(mp)
+            pn = portnums_pb2.PortNum.Name(mp.decoded.portnum)
+            prefix = f"{mp.channel} [{from_id:x}->{to_id}] {pn}:"
+        except Exception as e:
+            print(f"{prefix} could not be decrypted")
+
+    handler = protocols.get(mp.decoded.portnum)
+    if handler is None:
+        print("nothing came from protocols")
+        return
+
     if handler.protobufFactory is None:
-        print(f"{mp.channel} [{from_id:x}->{to_id}] {pn}: {mp.decoded.payload}")
+        print(f"{prefix} {mp.decoded.payload}")
     else:
         pb = handler.protobufFactory()
         pb.ParseFromString(mp.decoded.payload)
         p = MessageToJson(pb)
-        print(f"{mp.channel} [{from_id:x}->{to_id}] {pn}: {p}")
+        print(f"{prefix} {p}")
 
 def connect(client, username, pw, broker, port):
     try:
