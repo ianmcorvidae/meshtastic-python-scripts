@@ -3,10 +3,13 @@ import sys
 from meshtastic import mqtt_pb2, portnums_pb2, protocols, BROADCAST_NUM
 from google.protobuf.json_format import MessageToJson
 
+root_topic = 'msh'
+
 def on_connect(client, userdata, flags, reason_code, properties):
+    global root_topic
     if reason_code == 0:
-        client.subscribe('msh/2/c/#')
-        client.subscribe('msh/2/e/#')
+        client.subscribe(f'{root_topic}/2/c/#')
+        client.subscribe(f'{root_topic}/2/e/#')
     else:
         print(f"{userdata} {flags} {reason_code} {properties}")
 
@@ -61,5 +64,8 @@ if __name__ == "__main__":
     client.on_message = on_message
 
     connect(client, sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+
+    if len(sys.argv) > 5:
+        root_topic = sys.argv[5]
 
     client.loop_forever()
