@@ -26,8 +26,7 @@ def try_decode(mp):
 def on_connect(client, userdata, flags, reason_code, properties):
     global root_topic
     if reason_code == 0:
-        client.subscribe(f'{root_topic}/2/c/#')
-        client.subscribe(f'{root_topic}/2/e/#')
+        client.subscribe(f'{root_topic}/2/+/#')
     else:
         print(f"{userdata} {flags} {reason_code} {properties}")
 
