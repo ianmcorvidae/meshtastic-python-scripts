@@ -9,6 +9,7 @@ from cryptography.hazmat.backends import default_backend
 
 root_topic = 'msh'
 default_key = "1PG7OiApB1nwvP+rz05pAQ=="
+node_names = {}
 
 # with thanks to pdxlocs
 def try_decode(mp):
@@ -26,7 +27,8 @@ def try_decode(mp):
 def on_connect(client, userdata, flags, reason_code, properties):
     global root_topic
     if reason_code == 0:
-        client.subscribe(f'{root_topic}/2/+/#')
+        client.subscribe(f'{root_topic}/2/c/#')
+        client.subscribe(f'{root_topic}/2/e/#')
     else:
         print(f"{userdata} {flags} {reason_code} {properties}")
 
@@ -34,31 +36,39 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
     print(f"disconnected with reason code {str(reason_code)}")
 
 def on_message(client, userdata, msg):
+    global node_names
     se = mqtt_pb2.ServiceEnvelope()
     try:
         se.ParseFromString(msg.payload)
         mp = se.packet
     except Exception as e:
         print(f"ERROR: parsing service envelope: {str(e)}")
+        print(f"{msg.info} {msg.payload}")
         return
 
     from_id = getattr(mp, 'from')
+    if from_id in node_names:
+        from_id = f"{from_id:08x}[{node_names.get(getattr(mp,'from'))}]"
+    else:
+        from_id = f"{from_id:08x}"
     to_id = mp.to
     if to_id == BROADCAST_NUM:
         to_id = 'all'
     else:
-        to_id = f"{to_id:x}"
+        to_id = f"{to_id:08x}"
 
     pn = portnums_pb2.PortNum.Name(mp.decoded.portnum)
 
-    prefix = f"{mp.channel} [{from_id:x}->{to_id}] {pn}:"
+    prefix = f"{mp.channel} [{from_id}->{to_id}] {pn}:"
     if mp.HasField("encrypted") and not mp.HasField("decoded"):
         try:
             try_decode(mp)
             pn = portnums_pb2.PortNum.Name(mp.decoded.portnum)
-            prefix = f"{mp.channel} [{from_id:x}->{to_id}] {pn}:"
+            prefix = f"{mp.channel} [{from_id}->{to_id}] {pn}:"
         except Exception as e:
             print(f"{prefix} could not be decrypted")
+            return
+
 
     handler = protocols.get(mp.decoded.portnum)
     if handler is None:
@@ -71,6 +81,11 @@ def on_message(client, userdata, msg):
         pb = handler.protobufFactory()
         pb.ParseFromString(mp.decoded.payload)
         p = MessageToJson(pb)
+        if mp.decoded.portnum == portnums_pb2.PortNum.NODEINFO_APP:
+            print(f"node {getattr(mp,'from'):x} has short_name {pb.short_name}")
+            node_names[getattr(mp,"from")] = pb.short_name
+            from_id = f"{getattr(mp,'from'):x}[{node_names.get(getattr(mp,'from'))}]"
+            prefix = f"{mp.channel} [{from_id}->{to_id}] {pn}:"
         print(f"{prefix} {p}")
 
 def connect(client, username, pw, broker, port):
