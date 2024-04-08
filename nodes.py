@@ -70,6 +70,7 @@ if client.nodesByNum:
         row.update(
             {
                 "SNR": formatFloat(node.get("snr"), 2, " dB"),
+                "Hops Away": node.get("hopsAway", "unknown"),
                 "Channel": node.get("channel"),
                 "LastHeard": getLH(node.get("lastHeard")),
                 "Since": getTimeAgo(node.get("lastHeard")),
