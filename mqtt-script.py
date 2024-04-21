@@ -24,7 +24,7 @@ def try_decode(mp):
     data.ParseFromString(decrypted_bytes)
     mp.decoded.CopyFrom(data)
 
-def on_connect(client, userdata, flags, reason_code, properties):
+def on_connect(client, userdata, flags, reason_code, properties = None):
     global root_topic
     if reason_code == 0:
         client.subscribe(f'{root_topic}/2/c/#')
@@ -32,7 +32,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     else:
         print(f"{userdata} {flags} {reason_code} {properties}")
 
-def on_disconnect(client, userdata, flags, reason_code, properties):
+def on_disconnect(client, userdata, flags, reason_code, properties = None):
     print(f"disconnected with reason code {str(reason_code)}")
 
 def on_message(client, userdata, msg):
@@ -96,7 +96,10 @@ def connect(client, username, pw, broker, port):
         print(f"failed connect: {str(e)}")
 
 if __name__ == "__main__":
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="", clean_session=True, userdata=None)
+    try:
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="", clean_session=True, userdata=None)
+    except:
+        client = mqtt.Client(client_id="", clean_session=True, userdata=None)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_message = on_message
