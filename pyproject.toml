@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "meshtastic-python-scripts"
+version = "0.0.1"
+description = ""
+authors = ["Ian McEwen <ianmcorvidae@ianmcorvidae.net>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.13"
+meshtastic = "^2.3.12"
+paho-mqtt = "^2.1.0"
+cryptography = "^42.0.8"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

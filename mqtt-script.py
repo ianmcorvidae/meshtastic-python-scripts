@@ -1,6 +1,10 @@
 import paho.mqtt.client as mqtt
 import sys
-from meshtastic import mqtt_pb2, portnums_pb2, mesh_pb2, protocols, BROADCAST_NUM
+from meshtastic import protocols, BROADCAST_NUM
+try:
+    from meshtastic import mqtt_pb2, portnums_pb2, mesh_pb2
+except ImportError:
+    from meshtastic.protobuf import mqtt_pb2, portnums_pb2, mesh_pb2
 from google.protobuf.json_format import MessageToJson
 
 import base64
