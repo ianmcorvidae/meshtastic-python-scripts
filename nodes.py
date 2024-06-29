@@ -1,6 +1,11 @@
 from meshtastic.serial_interface import SerialInterface
 from datetime import datetime
-import timeago
+try:
+    from meshtastic.mesh_interface import _timeago
+    tg_underscore = True
+except ImportError:
+    tg_underscore = False
+    import timeago
 import json
 
 client = SerialInterface()
@@ -17,11 +22,14 @@ def getLH(ts):
 
 def getTimeAgo(ts):
     """Format how long ago have we heard from this node (aka timeago)."""
-    return (
-        timeago.format(datetime.fromtimestamp(ts), datetime.now())
-        if ts
-        else None
-    )
+    if tg_underscore and ts is not None:
+        return _timeago(int((datetime.now() - datetime.fromtimestamp(ts)).total_seconds()))
+    else:
+        return (
+            timeago.format(datetime.fromtimestamp(ts), datetime.now())
+            if ts
+            else None
+        )
 
 if client.nodesByNum:
     for node in client.nodesByNum.values():
