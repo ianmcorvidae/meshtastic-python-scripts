@@ -9,7 +9,7 @@ except ImportError:
     from meshtastic import channel_pb2, admin_pb2, portnums_pb2
 import sys
 
-requestId = None
+requestIds = []
 gotResponse = False
 
 def make_channel(role=channel_pb2.Channel.Role.DISABLED, index=0, name=None, psk=None):
@@ -29,15 +29,17 @@ def printable_packet(packet):
     From: {packet['from']:08x}
     To:   {packet['to']:08x}
     Port: {packet['decoded']['portnum']}"""
+    if 'requestId' in packet['decoded']:
+        ret += f"\n    Req:  {packet['decoded']['requestId']}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
         ret += f"\n    Err: {packet['decoded']['routing']['errorReason']}"
     return ret
 
 def onReceive(packet, interface):
-    global gotResponse, requestId
+    global gotResponse, requestIds
     if 'decoded' in packet:
         if 'requestId' in packet['decoded']:
-            if packet['decoded']['requestId'] == requestId:
+            if packet['decoded']['requestId'] in requestIds:
                 if packet['decoded']['portnum'] == 'ROUTING_APP' and packet['decoded']['routing']['errorReason'] == "NONE":
                     if packet['from'] == interface.localNode.nodeNum:
                         print(f"{packet['id']}\t|| Got implicit ack, continuing to wait...")
@@ -66,27 +68,34 @@ def sendAdmin(client, packet, remote_node):
             channelIndex=adminIndex,
     )
 
-if __name__ == "__main__":
-    remote_node = sys.argv[1]
-
-    ch = make_channel(index=int(sys.argv[2]))
-
-    pub.subscribe(onReceive, "meshtastic.receive")
-
-    client = SerialInterface()
-    #client = TCPInterface()
-    node = client.getNode(remote_node, False) # false prevents channel requests
+def sendOnce(client, remote_node, *args, **kwargs):
+    ch = make_channel(*args, **kwargs)
 
     p = admin_pb2.AdminMessage()
     p.set_channel.CopyFrom(ch)
 
     pkt = sendAdmin(client, p, remote_node)
 
-    requestId = pkt.id
+    requestIds.append(pkt.id)
     print(f"SENT: request id {pkt.id}")
     print("      waiting for ack")
 
+if __name__ == "__main__":
+    remote_node = sys.argv[1]
+
+    pub.subscribe(onReceive, "meshtastic.receive")
+
+    client = SerialInterface()
+
+    sendOnce(client, remote_node, index=int(sys.argv[2]))
+
+    i = 0
     while not gotResponse:
+        if i >= 60:
+            print("roughly a minute has passed, try again")
+            sendOnce(client, remote_node, index=int(sys.argv[2]))
+            i = 0
         time.sleep(1)
+        i = i + 1
 
     client.close()
