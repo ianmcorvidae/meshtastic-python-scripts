@@ -40,7 +40,7 @@ def onReceive(packet, interface):
             if packet['decoded']['requestId'] == requestId:
                 if packet['decoded']['portnum'] == 'ROUTING_APP' and packet['decoded']['routing']['errorReason'] == "NONE":
                     if packet['from'] == interface.localNode.nodeNum:
-                        print(f"{packet['id']}\t||Got implicit ack, continuing to wait...")
+                        print(f"{packet['id']}\t|| Got implicit ack, continuing to wait...")
                     else:
                         print(f"{packet['id']}\t|| Got ack: {printable_packet(packet)}")
                         gotResponse = True
