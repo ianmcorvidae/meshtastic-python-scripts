@@ -32,7 +32,7 @@ def printable_packet(packet):
     if 'requestId' in packet['decoded']:
         ret += f"\n    Req:  {packet['decoded']['requestId']}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
-        ret += f"\n    Err: {packet['decoded']['routing']['errorReason']}"
+        ret += f"\n    Err:  {packet['decoded']['routing']['errorReason']}"
     return ret
 
 def onReceive(packet, interface):
