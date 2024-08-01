@@ -11,6 +11,7 @@ python = ">=3.8,<3.13"
 meshtastic = "^2.3.12"
 paho-mqtt = "^2.1.0"
 cryptography = "^42.0.8"
+bitstring = "^4.2.3"
 
 
 [build-system]
