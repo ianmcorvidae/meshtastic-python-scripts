@@ -175,7 +175,6 @@ else:
         "--port",
         help=f"The port to connect to via serial, e.g. `{Fore.BLUE}COM5{Fore.RESET}` or `{Fore.BLUE}/dev/ttyUSB0{Fore.RESET}`. NOT YET IMPLEMENTED.",
         default=None,
-        action=
     )
     conn.add_argument(
         "--host",
