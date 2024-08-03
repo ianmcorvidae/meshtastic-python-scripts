@@ -169,12 +169,13 @@ else:
     helpGroup = parser.add_argument_group("Help")
     helpGroup.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
 
-    connOuter = parser.add_argument_group('Connection', 'Optional arguments to specify a device to connect to and how. When unspecified, will use serial. If more than one serial device is connected, --port is required')
+    connOuter = parser.add_argument_group('Connection', 'Optional arguments to specify a device to connect to and how. When unspecified, will use serial. If more than one serial device is connected, --port is required.')
     conn = connOuter.add_mutually_exclusive_group()
     conn.add_argument(
         "--port",
         help=f"The port to connect to via serial, e.g. `{Fore.BLUE}COM5{Fore.RESET}` or `{Fore.BLUE}/dev/ttyUSB0{Fore.RESET}`. NOT YET IMPLEMENTED.",
         default=None,
+        action=
     )
     conn.add_argument(
         "--host",
@@ -236,20 +237,18 @@ else:
     )
 
     args = parser.parse_args()
-    if args.ble:
+
+    if args.ble: #set the method argument to the method variable, and also set readablemethod
         method = "ble"
+        readablemethod = "Bluetooth/BLE"
     elif args.host:
         method = "tcp"
+        readablemethod = "Network/TCP"
     else:
         method = "usb"
-    match method:
-        case "usb":
-            readablemethod = "USB Serial"
-        case "ble":
-            readablemethod = "Bluetooth/BLE"
-        case "tcp":
-            readablemethod = "Network/TCP"
-    if args.delete:
+        readablemethod = "Bluetooth/BLE"
+
+    if args.delete: #set the action variable
         action="del"
     else:
         action="set"
