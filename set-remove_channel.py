@@ -11,14 +11,14 @@ except ImportError:
     from meshtastic import channel_pb2, admin_pb2, portnums_pb2
 import sys
 import argparse
-from colorama import Fore #colors
 import os #OS detect
-
-
+os.system('') #required to get colorama to work in windows command line
+from colorama import Fore #colors
+print(os.name)
 #Color scheme:
-#RED: errors
-#MAGENTA: warnings
-#BLUE: informational
+#LIGHTRED_EX: errors
+#LIGHTMAGENTA_EX: warnings
+#LIGHTBLUE_EX: informational
 #GREEN: only used when script succeeds
 
 def keypress(): #input single character, cross-platform
@@ -38,17 +38,17 @@ def keypress(): #input single character, cross-platform
         return char
 
 def exitscript():
-    print(f"{Fore.RED}Quitting...{Fore.RESET}")
+    print(f"{Fore.LIGHTRED_EX}Quitting...{Fore.RESET}")
     quit()
 
 requestIds = []
 gotResponse = False
 if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         print(f"""\nConnection method:
-    {Fore.BLUE}1.{Fore.RESET} USB Serial
-    {Fore.BLUE}2.{Fore.RESET} Network/TCP
-    {Fore.BLUE}3.{Fore.RESET} Bluetooth/BLE
-    {Fore.BLUE}0.{Fore.RESET} Quit""")
+    {Fore.LIGHTBLUE_EX}1.{Fore.RESET} USB Serial
+    {Fore.LIGHTBLUE_EX}2.{Fore.RESET} Network/TCP
+    {Fore.LIGHTBLUE_EX}3.{Fore.RESET} Bluetooth/BLE
+    {Fore.LIGHTBLUE_EX}0.{Fore.RESET} Quit""")
         i = 0
         key = "X" #initial value for keypress detector
         via = "" #port, IP/hostname or BLE mac address/device name
@@ -61,21 +61,21 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                     readablemethod="USB Serial"
                     availableports = [comport.device for comport in serial.tools.list_ports.comports()] #mian - this does not work on linux. Leaving this one to you. My head hurts.
                     if len(availableports) > 2:
-                        print(f"More than one serial device detected: {Fore.BLUE}{availableports}{Fore.RESET}.")
+                        print(f"More than one serial device detected: {Fore.LIGHTBLUE_EX}{availableports}{Fore.RESET}.")
                         if os.name == "nt":
                             prefix = "COM"
                         else:
                             prefix = "" #prefix for other OS's? Not really necessary to fill this string.
                         i = 0
                         while via not in availableports:
-                            if i>0: print(f"{Fore.RED}Enter a valid serial port.{Fore.RESET}")
+                            if i>0: print(f"{Fore.LIGHTRED_EX}Enter a valid serial port.{Fore.RESET}")
                             if i==3: exitscript()
                             i += 1
                             via = prefix+input(f"Port: {prefix}")
                     elif len(availableports) == 2:
                         via = availableports[1]
                     else:
-                        print(f"{Fore.RED}No USB serial devices detected!{Fore.RESET}")
+                        print(f"{Fore.LIGHTRED_EX}No USB serial devices detected!{Fore.RESET}")
                         exitscript()
                     break
                 case "2":
@@ -89,31 +89,31 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                     break
                 case "3":
                     method = "ble"
-                    readablemethod = "Bluetooth/BLE"
+                    readablemethod = "LIGHTBLUE_EXtooth/BLE"
                     i = 0
                     while via == "":
                         if i==3: exitscript()
                         i += 1
-                        via = input(f"Bluetooth MAC address or name: ")
+                        via = input(f"LIGHTBLUE_EXtooth MAC address or name: ")
                     break
                 case "0":
                     quit()
                 case "\x1b": #esc key
                     quit()
                 case _:
-                    print(f"{Fore.RED}You must choose 1, 2, 3 or 0.{Fore.RESET}")
+                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3 or 0.{Fore.RESET}")
             if i == 3:
                 exitscript()
 
         if via: #if a serial port, ip/hostname or ble mac address/name has been stated, display it to user
-            readablemethod = readablemethod + f" {Fore.RESET}via{Fore.BLUE} " + via
+            readablemethod = readablemethod + f" {Fore.RESET}via{Fore.LIGHTBLUE_EX} " + via
                 
-        print(f"*** Connection method {key}: {Fore.BLUE}{readablemethod}{Fore.RESET} ***\n")
+        print(f"*** Connection method {key}: {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET} ***\n")
 
-        print(f"""*** {Fore.MAGENTA}CAREFUL!{Fore.RESET} Don't overwrite/delete admin channel! ***
-    {Fore.BLUE}1.{Fore.RESET} Add/replace a channel
-    {Fore.BLUE}2.{Fore.RESET} Delete a channel
-    {Fore.BLUE}0.{Fore.RESET} Quit""")
+        print(f"""*** {Fore.LIGHTMAGENTA_EX}CAREFUL!{Fore.RESET} Don't overwrite/delete admin channel! ***
+    {Fore.LIGHTBLUE_EX}1.{Fore.RESET} Add/replace a channel
+    {Fore.LIGHTBLUE_EX}2.{Fore.RESET} Delete a channel
+    {Fore.LIGHTBLUE_EX}0.{Fore.RESET} Quit""")
         i = 0
         key = "X" #initial value for keypress detector
         while key not in ("1", "2", "0"):
@@ -122,16 +122,16 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             match key:
                 case "1":
                     action = "set"
-                    print(f"*** Mode 1: {Fore.BLUE}Add/replace Channel{Fore.RESET} ***\n")
+                    print(f"*** Mode 1: {Fore.LIGHTBLUE_EX}Add/replace Channel{Fore.RESET} ***\n")
                 case "2":
-                    print(f"*** Mode 2: {Fore.BLUE}Delete Channel{Fore.RESET} ***\n")
+                    print(f"*** Mode 2: {Fore.LIGHTBLUE_EX}Delete Channel{Fore.RESET} ***\n")
                     action = "del"
                 case "0":
                     quit()
                 case "\x1b": #esc key
                     quit()
                 case _:
-                    print(f"{Fore.RED}You must choose 1, 2 or 0...{Fore.RESET}")
+                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2 or 0...{Fore.RESET}")
             if i == 3:
                 exitscript()
 
@@ -141,7 +141,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             channelname = input('Channel name:\t\t')
             channelpsk = input('Channel PSK:\t\t')
 
-        print(f"Send command? {Fore.BLUE}(y/n){Fore.RESET}")
+        print(f"Send command? {Fore.LIGHTBLUE_EX}(y/n){Fore.RESET}")
         i = 0
         key = "X" #initial value for keypress detector
         while key.lower() not in ("y", "n"):
@@ -150,12 +150,12 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             if key.lower() == "y":
                 break
             elif key.lower() == "n":
-                print(f"{Fore.RED}Quitting...{Fore.RESET}")
+                print(f"{Fore.LIGHTRED_EX}Quitting...{Fore.RESET}")
                 quit()
             elif key == "\x1b": #esc key
                     quit()
             else:
-                print(f"{Fore.RED}You must choose y or n...{Fore.RESET}")
+                print(f"{Fore.LIGHTRED_EX}You must choose y or n...{Fore.RESET}")
             if i == 3:
                 exitscript()
 else:
@@ -164,7 +164,7 @@ else:
     parser = argparse.ArgumentParser(
             add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog=f"{Fore.BLUE}This is a script to add/set or delete a channel remotely.\nMeshtastic apps are not able to reliably alter channels remotely (via admin channel) due to their requirement to get all remote channels before changing them.\nThis script skips getting the channels from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node. For more information, visit: https://meshtastic.org/docs/configuration/remote-admin/\n*** {Fore.MAGENTA}CAREFUL! Don't overwrite/delete admin channel!{Fore.BLUE} ***{Fore.MAGENTA}\nLeave channel list contiguous!{Fore.BLUE} Deleting middle channels may lead to unexpected behaviors.\nThis script can also be used WITHOUT any arguments - in this case, it will give prompts.{Fore.RESET}")
+            epilog=f"{Fore.LIGHTBLUE_EX}This is a script to add/set or delete a channel remotely.\nMeshtastic apps are not able to reliably alter channels remotely (via admin channel) due to their requirement to get all remote channels before changing them.\nThis script skips getting the channels from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node (see https://meshtastic.org/docs/configuration/remote-admin/)\n*** {Fore.LIGHTMAGENTA_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.LIGHTBLUE_EX} ***{Fore.LIGHTMAGENTA_EX}\nLeave channel list contiguous!{Fore.LIGHTBLUE_EX} Deleting middle channels may lead to unexpected behaviors.\nThis script can also be used WITHOUT any arguments - in this case, it will give prompts.{Fore.RESET}")
 
     helpGroup = parser.add_argument_group("Help")
     helpGroup.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
@@ -173,7 +173,7 @@ else:
     conn = connOuter.add_mutually_exclusive_group()
     conn.add_argument(
         "--port",
-        help=f"The port to connect to via serial, e.g. `{Fore.BLUE}COM5{Fore.RESET}` or `{Fore.BLUE}/dev/ttyUSB0{Fore.RESET}`. NOT YET IMPLEMENTED.",
+        help=f"The port to connect to via serial, e.g. `{Fore.LIGHTBLUE_EX}COM5{Fore.RESET}` or `{Fore.LIGHTBLUE_EX}/dev/ttyUSB0{Fore.RESET}`. NOT YET IMPLEMENTED.",
         default=None,
     )
     conn.add_argument(
@@ -184,7 +184,7 @@ else:
     conn.add_argument(
         "--ble",
         "--bt",
-        help="The Bluetooth device MAC address or name to connect to. NOT YET IMPLEMENTED.",
+        help="The LIGHTBLUE_EXtooth device MAC address or name to connect to. NOT YET IMPLEMENTED.",
         default=None,
     )
 
@@ -209,12 +209,12 @@ else:
     id = identity.add_mutually_exclusive_group(required=True)
     id.add_argument(
         "--nodeid",
-        help=f"nodeID we are sending commands to (e.g `{Fore.BLUE}!ba4bf9d0{Fore.RESET}`).",
+        help=f"nodeID we are sending commands to (e.g `{Fore.LIGHTBLUE_EX}!ba4bf9d0{Fore.RESET}`).",
         type=str.lower,
     )
     id.add_argument(
         "--nodenum",
-        help=f"Node number we are sending commands to (e.g `{Fore.BLUE}1828779180{Fore.RESET}`).",
+        help=f"Node number we are sending commands to (e.g `{Fore.LIGHTBLUE_EX}1828779180{Fore.RESET}`).",
         type=str.lower,
     )
 
@@ -239,13 +239,13 @@ else:
 
     if args.ble: #set the method argument to the method variable, and also set readablemethod
         method = "ble"
-        readablemethod = "Bluetooth/BLE"
+        readablemethod = "LIGHTBLUE_EXtooth/BLE"
     elif args.host:
         method = "tcp"
         readablemethod = "Network/TCP"
     else:
         method = "usb"
-        readablemethod = "Bluetooth/BLE"
+        readablemethod = "LIGHTBLUE_EXtooth/BLE"
 
     if args.delete: #set the action variable
         action="del"
@@ -267,9 +267,9 @@ except:
 else:
     viatext = f" via {via}"
 if action == "set":
-    print(f"\n*** {Fore.BLUE}Sending channel to {nodeid} over {readablemethod}{viatext}. Will retry until acknowledgment is received{Fore.RESET} ***")
+    print(f"\n*** {Fore.LIGHTBLUE_EX}Sending channel to {nodeid} over {readablemethod}{viatext}. Will retry until acknowledgment is received{Fore.RESET} ***")
 else:
-    print(f"\n*** {Fore.BLUE}Sending \"Delete Channel {channelnum}\" command to {nodeid}. Will retry until acknowledgment is received{Fore.RESET} ***")
+    print(f"\n*** {Fore.LIGHTBLUE_EX}Sending \"Delete Channel {channelnum}\" command to {nodeid}. Will retry until acknowledgment is received{Fore.RESET} ***")
 
 
 if action == "set": #we're adding/setting a channel
@@ -297,14 +297,14 @@ else: #we're deleting a channel
 
 def printable_packet(packet):
     ret = f"""
-    Packet ID:\t{Fore.BLUE}{packet['id']}{Fore.RESET}
-    From:\t{Fore.BLUE}{packet['from']:08x}{Fore.RESET} (remote node)
-    To:\t\t{Fore.BLUE}{packet['to']:08x}{Fore.RESET} (you)
-    Port:\t{Fore.BLUE}{packet['decoded']['portnum']}{Fore.RESET}"""
+    Packet ID:\t{Fore.LIGHTBLUE_EX}{packet['id']}{Fore.RESET}
+    From:\t{Fore.LIGHTBLUE_EX}{packet['from']:08x}{Fore.RESET} (remote node)
+    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)
+    Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
     if 'requestId' in packet['decoded']:
-        ret += f"\n    Request ID:\t{Fore.BLUE}{packet['decoded']['requestId']}{Fore.RESET}"
+        ret += f"\n    Request ID:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['requestId']}{Fore.RESET}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
-        ret += f"\n    Error:\t{Fore.RED}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
+        ret += f"\n    Error:\t{Fore.LIGHTRED_EX}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
     return ret
 
 def onReceive(packet, interface):
@@ -322,9 +322,9 @@ def onReceive(packet, interface):
                         print(f"*** Received acknowledgement of channel {channelnum} ***")
                         print(f"************** Took {attempts} attempts **************")
                 else:
-                    print(f"{Fore.RED}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
-                    print(f"*** {Fore.RED}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
-                    if packet['decoded']['routing']['errorReason'] == "NO_CHANNEL": print("`Error: NO_CHANNEL` indicates that you do not have an admin channel in common with the remote node.")
+                    print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
+                    #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
+                    if packet['decoded']['routing']['errorReason'] == "NO_CHANNEL": print(f"`Error: NO_CHANNEL` indicates that you do not have an admin channel in common with the remote node.\nFor more information, see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}")
                     gotResponse = True
             #else:
                 #print(f"{packet['id']}\t|| got response for different packet: {packet['decoded']['requestId']}")
@@ -352,7 +352,7 @@ def sendOnce(client, nodeid, *args, **kwargs):
     pkt = sendAdmin(client, p, nodeid)
 
     requestIds.append(pkt.id)
-    print(f"{Fore.BLUE}Sent channel to remote node (packet ID: {pkt.id}){Fore.RESET}")
+    print(f"{Fore.LIGHTBLUE_EX}Sent channel to remote node (packet ID: {pkt.id}){Fore.RESET}")
     print("Waiting for acknowledgement...")
 
 if __name__ == "__main__":
@@ -370,7 +370,7 @@ if __name__ == "__main__":
     attempts = 1
     while not gotResponse:
         if i >= 30:
-            print(f"{Fore.RED}Timed out, retrying... (attempt #{attempts}){Fore.RESET}")
+            print(f"{Fore.LIGHTRED_EX}Timed out, retrying... (attempt #{attempts}){Fore.RESET}")
             sendOnce(client, nodeid, index=int(channelnum))
             attempts += 1
             i = 0
