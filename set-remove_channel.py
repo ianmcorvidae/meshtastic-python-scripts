@@ -212,7 +212,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                             case _:
                                 LoraSettings['preset'] = None
                         if LoraSettings['preset'] == None:
-                            print(f"{Fore.LIGHTRED_EX}You must choose {Fore.LIGHTBLUE_EX}0{Fore.LIGHTRED_EX}-{Fore.LIGHTBLUE_EX}8{Fore.LIGHTRED_EX} or press {Fore.LIGHTBLUE_EX}ENTER{Fore.LIGHTRED_EX}...{Fore.RESET}")
+                            print(f"{Fore.LIGHTRED_EX}You must choose {Fore.LIGHTBLUE_EX}1{Fore.LIGHTRED_EX}-{Fore.LIGHTBLUE_EX}8{Fore.LIGHTRED_EX} or press {Fore.LIGHTBLUE_EX}ENTER{Fore.LIGHTRED_EX}...{Fore.RESET}")
                             ip += 1
                         if ip == 3: exitscript()
                     print()
