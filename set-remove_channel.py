@@ -379,7 +379,7 @@ else:
     loraset.add_argument(  #note that this is the opposite of the usual (argument is used to disable preset, not enable)
         "--presetoff",
         help="Don't use modem preset. Default (disabled) if not included.",
-        default=None,
+        default="",
         action='store_true'
     )
     loraset.add_argument(
@@ -387,22 +387,22 @@ else:
         help="Which modem preset to use. Default (LONG_FAST) if left blank.",
         choices=['SHORT_FAST','SHORT_SLOW','MEDIUM_FAST','MEDIUM_SLOW','LONG_FAST','LONG_MODERATE','LONG_SLOW','VERY_LONG_SLOW'],
         metavar="PRESET",
-        default='LONG_FAST',
+        default='',
     )
     loraset.add_argument(
         "--bandwidth",
         help="LoRa bandwidth. REQUIRED if not using LoRa preset.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--spread",
         help="LoRa spread factor. REQUIRED if not using LoRa preset.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--codingrate",
         help="LoRa bandwidth. REQUIRED if not using LoRa preset.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--freqoffset",
@@ -412,22 +412,22 @@ else:
     loraset.add_argument(
         "--hoplimit",
         help="Hop limit. Default (3) if not included.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--txpwr",
         help="LoRa TX power. Default (30) if not included.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--freqslot",
         help="Frequency slot. Default (changes according to region and primary channel name) if not included.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--overfreq",
         help="LoRa Override Frequency (MHz). overrides Frequency slot. Default (changes according to region and primary channel name) if not included.",
-        default=None,
+        default="",
     )
     loraset.add_argument(
         "--overduty",
@@ -438,25 +438,25 @@ else:
     loraset.add_argument( #note that this is the opposite of the usual (argument is used to disable preset, not enable)
         "--sx126xoff",
         help="Disable SX126X RX boosted gain. Default (disabled) if not included.",
-        default=None,
+        default="",
         action='store_true'
     )
     loraset.add_argument(
         "--ignoremqtt",
         help="Ignore MQTT. Default (disabled if in a region with no duty cycle, enabled otherwise) if not included.",
-        default=None,
+        default="",
         action='store_true',
     )
     loraset.add_argument(
         "--pafanoff",
         help="Disables PA (power amplifier) fan. Default (disabled) if not included.",
-        default=None,
+        default="",
         action='store_true',
     )
     loraset.add_argument(
         "--ignore",
         help="Ignore list. Default (none) if left blank. Up to three comma-delineated nodeID's including !. Example: `!nodeid01,!nodeid02,!nodeid03`.",
-        default=None,
+        default="",
     )
     
 
@@ -521,9 +521,9 @@ else:
     channelnum = args.channum
     channelname = args.name
     channelpsk = args.psk
- 
+    LoraSettings = {}
     LoraSettings['region'] = args.region
-    LoraSettings['use_preset'] = not args.presetoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
+    if args.presetoff != "": LoraSettings['use_preset'] = not args.presetoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
     LoraSettings['preset'] = args.preset
     LoraSettings['bandwidth'] = args.bandwidth
     LoraSettings['spread_factor'] = args.spread
@@ -534,11 +534,11 @@ else:
     LoraSettings['freqslot'] = args.freqslot
     LoraSettings['override_frequency'] = args.overfreq
     LoraSettings['override_duty_cycle'] = args.overduty
-    LoraSettings['sx126x_rx_boosted_gain'] = not args.sx126xoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
+    if args.sx126xoff != "": LoraSettings['sx126x_rx_boosted_gain'] = not args.sx126xoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
     LoraSettings['ignore_mqtt'] = args.ignoremqtt
     LoraSettings['pa_fan_disabled'] = args.pafanoff
     LoraSettings['ignore_incoming'] = args.ignore #comma delineated list
-
+    print(LoraSettings)
 match action:
     case "set":
         readableaction = "Set Channel"
