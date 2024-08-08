@@ -148,7 +148,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 print(f"{Fore.LIGHTRED_EX}You must enter a nodeID.{Fore.RESET}")
                 if i == 3: exitscript()
 
-        if action == "set" or action == "del": channelnum = input('Channel number (required):\t\t')
+        if action == "set" or action == "del": channelnum = input('Channel number:\t\t')
         if action == "set":
             channelname = input('Channel name:\t\t')
             channelpsk = input('Channel PSK:\t\t')
@@ -580,12 +580,16 @@ def printable_packet(packet):
     ret = f"""
     Packet ID:\t{Fore.LIGHTBLUE_EX}{packet['id']}{Fore.RESET}
     From:\t{Fore.LIGHTBLUE_EX}{packet['from']:08x}{Fore.RESET} (remote node)
-    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)
-    Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
+    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)"""
+    #Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
     if 'requestId' in packet['decoded']:
         ret += f"\n    Request ID:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['requestId']}{Fore.RESET}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
-        ret += f"\n    Error:\t{Fore.LIGHTRED_EX}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
+        if not packet['decoded']['routing']['errorReason'] == "NONE":
+            colorstart = f"{Fore.LIGHTRED_EX}"
+        else:
+            colorstart = f"{Fore.LIGHTBLUE_EX}"
+        ret += f"\n    Error:\t{colorstart}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
     return ret
 
 def onReceive(packet, interface):
@@ -600,8 +604,8 @@ def onReceive(packet, interface):
                         print(f"{Fore.GREEN}Received acknowledgement:{Fore.RESET} {printable_packet(packet)}")
                         gotResponse = True
                         print(f"\n***************    {Fore.GREEN}SUCCESS{Fore.RESET}    ***************")
-                        print(f"*** Received acknowledgement of channel {channelnum} ***")
-                        print(f"************** Took {attempts} attempts **************")
+                        print(f"*** Received acknowledgement of channel {Fore.LIGHTBLUE_EX}{channelnum}{Fore.RESET} ***")
+                        print(f"************** Took {Fore.LIGHTBLUE_EX}{attempts}{Fore.RESET} attempts **************")
                 else:
                     print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
                     #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
