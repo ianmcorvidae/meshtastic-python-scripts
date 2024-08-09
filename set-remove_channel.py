@@ -50,11 +50,12 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
     {Fore.LIGHTBLUE_EX}1.{Fore.RESET} USB Serial
     {Fore.LIGHTBLUE_EX}2.{Fore.RESET} Network/TCP
     {Fore.LIGHTBLUE_EX}3.{Fore.RESET} Bluetooth/BLE
+    {Fore.LIGHTBLUE_EX}4.{Fore.RESET} Help
     {Fore.LIGHTBLUE_EX}0.{Fore.RESET} Quit""")
         i = 0
         key = "X" #initial value for keypress detector
         via = "" #port, IP/hostname or BLE mac address/device name
-        while key not in ("1", "2", "3", "0"):
+        while key not in ("1", "2", "3", "4", "0"):
             key = keypress()
             i += 1
             match key:
@@ -98,12 +99,15 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                         i += 1
                         via = input(f"Bluetooth MAC address or name: ")
                     break
+                case "4":
+                    print(f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTMAGENTA_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTMAGENTA_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script can also be used with arguments - run `{Fore.LIGHTBLUE_EX}set-remove_channel.py --help{Fore.RESET}`.""")
+                    exitscript()
                 case "0":
                     quit()
                 case "\x1b": #esc key
                     quit()
                 case _:
-                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3 or 0.{Fore.RESET}")
+                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3, 4 or 0.{Fore.RESET}")
             if i == 3:
                 exitscript()
 
@@ -148,7 +152,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 print(f"{Fore.LIGHTRED_EX}You must enter a nodeID.{Fore.RESET}")
                 if i == 3: exitscript()
 
-        if action == "set" or action == "del": channelnum = input('Channel number (required):\t\t')
+        if action == "set" or action == "del": channelnum = input('Channel number:\t\t')
         if action == "set":
             channelname = input('Channel name:\t\t')
             channelpsk = input('Channel PSK:\t\t')
@@ -274,7 +278,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
 
             LoraSettings['ignore_incoming'] = input(f"Ignore list. Up to three comma-delineated nodeID's. Example: `{Fore.LIGHTBLUE_EX}!nodeid01,!nodeid02,!nodeid03{Fore.RESET}` ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip): ")
 
-            print(LoraSettings)
+
         print(f"\nSend command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
         i = 0
         key = "X" #initial value for keypress detector
@@ -538,7 +542,6 @@ else:
     LoraSettings['ignore_mqtt'] = args.ignoremqtt
     LoraSettings['pa_fan_disabled'] = args.pafanoff
     LoraSettings['ignore_incoming'] = args.ignore #comma delineated list
-    print(LoraSettings)
 match action:
     case "set":
         readableaction = "Set Channel"
@@ -558,6 +561,8 @@ if action == "set": #we're adding/setting a channel
         if role != channel_pb2.Channel.Role.DISABLED:
             if name is not None:
                 ch.settings.name = name
+            if psk == "base64:":
+                psk += "AQ==" #fixes bug when setting channel 0 with no PSK (caused node reboot)
             if psk is not None:
                 ch.settings.psk = fromPSK(psk)
         return ch
@@ -580,12 +585,16 @@ def printable_packet(packet):
     ret = f"""
     Packet ID:\t{Fore.LIGHTBLUE_EX}{packet['id']}{Fore.RESET}
     From:\t{Fore.LIGHTBLUE_EX}{packet['from']:08x}{Fore.RESET} (remote node)
-    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)
-    Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
+    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)"""
+    #Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
     if 'requestId' in packet['decoded']:
         ret += f"\n    Request ID:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['requestId']}{Fore.RESET}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
-        ret += f"\n    Error:\t{Fore.LIGHTRED_EX}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
+        if not packet['decoded']['routing']['errorReason'] == "NONE":
+            colorstart = f"{Fore.LIGHTRED_EX}"
+        else:
+            colorstart = f"{Fore.LIGHTBLUE_EX}"
+        ret += f"\n    Error:\t{colorstart}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
     return ret
 
 def onReceive(packet, interface):
@@ -600,8 +609,8 @@ def onReceive(packet, interface):
                         print(f"{Fore.GREEN}Received acknowledgement:{Fore.RESET} {printable_packet(packet)}")
                         gotResponse = True
                         print(f"\n***************    {Fore.GREEN}SUCCESS{Fore.RESET}    ***************")
-                        print(f"*** Received acknowledgement of channel {channelnum} ***")
-                        print(f"************** Took {attempts} attempts **************")
+                        print(f"*** Received acknowledgement of channel {Fore.LIGHTBLUE_EX}{channelnum}{Fore.RESET} ***")
+                        print(f"************** Took {Fore.LIGHTBLUE_EX}{attempts}{Fore.RESET} attempts **************")
                 else:
                     print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
                     #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
