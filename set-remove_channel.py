@@ -76,8 +76,8 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                         if i==3: exitscript()
                         i += 1
                         via = prefix+input(f"Port: {prefix}")
-                elif len(availableports) == 2:
-                    via = availableports[1]
+                elif len(availableports) == 1:
+                    via = availableports[0]
                 else:
                     print(f"{Fore.LIGHTRED_EX}No USB serial devices detected!{Fore.RESET}")
                     exitscript()
@@ -582,9 +582,9 @@ elif action == "tx": #we're enabling tx
         command.region = config_pb2.Config.LoRaConfig.RegionCode.Value(LoraSettings['region'].upper())
         if LoraSettings['use_preset']: command.use_preset = LoraSettings['use_preset']
         if LoraSettings['modem_preset']: command.modem_preset = config_pb2.Config.LoRaConfig.ModemPreset.Value(LoraSettings['modem_preset'])
-        if LoraSettings['bandwidth']: command.bandwidth = int(LoraSettings['bandwidth'])
-        if LoraSettings['spread_factor']: command.spread_factor = int(LoraSettings['spread_factor'])
-        if LoraSettings['coding_rate']: command.coding_rate = int(LoraSettings['coding_rate'])
+        if LoraSettings.get('bandwidth'): command.bandwidth = int(LoraSettings['bandwidth'])
+        if LoraSettings.get('spread_factor'): command.spread_factor = int(LoraSettings['spread_factor'])
+        if LoraSettings.get('coding_rate'): command.coding_rate = int(LoraSettings['coding_rate'])
         if LoraSettings['frequency_offset']: command.frequency_offset = int(LoraSettings['frequency_offset'])
         if LoraSettings['hop_limit']: command.hop_limit = int(LoraSettings['hop_limit'])
         if LoraSettings['tx_power']: command.tx_power = int(LoraSettings['tx_power'])
