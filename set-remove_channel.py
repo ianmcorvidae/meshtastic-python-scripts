@@ -60,56 +60,54 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         while key not in ("1", "2", "3", "4", "0"):
             key = keypress()
             i += 1
-            match key:
-                case "1":
-                    method = "usb"
-                    readablemethod="USB Serial"
-                    availableports = findPorts(True) #mian - this does not work on linux. Leaving this one to you. My head hurts.
-                    if len(availableports) > 1:
-                        print(f"More than one serial device detected: {Fore.LIGHTBLUE_EX}{availableports}{Fore.RESET}.")
-                        if os.name == "nt":
-                            prefix = "COM"
-                        else:
-                            prefix = "" #prefix for other OS's? Not really necessary to fill this string.
-                        i = 0
-                        while via not in availableports:
-                            if i>0: print(f"{Fore.LIGHTRED_EX}Enter a valid serial port.{Fore.RESET}")
-                            if i==3: exitscript()
-                            i += 1
-                            via = prefix+input(f"Port: {prefix}")
-                    elif len(availableports) == 2:
-                        via = availableports[1]
+            if key == "1":
+                method = "usb"
+                readablemethod="USB Serial"
+                availableports = findPorts(True) #mian - this does not work on linux. Leaving this one to you. My head hurts.
+                if len(availableports) > 1:
+                    print(f"More than one serial device detected: {Fore.LIGHTBLUE_EX}{availableports}{Fore.RESET}.")
+                    if os.name == "nt":
+                        prefix = "COM"
                     else:
-                        print(f"{Fore.LIGHTRED_EX}No USB serial devices detected!{Fore.RESET}")
-                        exitscript()
-                    break
-                case "2":
-                    method = "tcp"
-                    readablemethod = "Network/TCP"
+                        prefix = "" #prefix for other OS's? Not really necessary to fill this string.
                     i = 0
-                    while via == "":
+                    while via not in availableports:
+                        if i>0: print(f"{Fore.LIGHTRED_EX}Enter a valid serial port.{Fore.RESET}")
                         if i==3: exitscript()
                         i += 1
-                        via = input(f"IP/Hostname: ")
-                    break
-                case "3":
-                    method = "ble"
-                    readablemethod = "Bluetooth/BLE"
-                    i = 0
-                    while via == "":
-                        if i==3: exitscript()
-                        i += 1
-                        via = input(f"Bluetooth MAC address or name: ")
-                    break
-                case "4":
-                    print(helptext+f"This script can also be used with arguments - run `{Fore.LIGHTBLUE_EX}set-remove_channel.py --help{Fore.RESET}`.")
+                        via = prefix+input(f"Port: {prefix}")
+                elif len(availableports) == 2:
+                    via = availableports[1]
+                else:
+                    print(f"{Fore.LIGHTRED_EX}No USB serial devices detected!{Fore.RESET}")
                     exitscript()
-                case "0":
-                    quit()
-                case "\x1b": #esc key
-                    quit()
-                case _:
-                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3, 4 or 0.{Fore.RESET}")
+                break
+            elif key == "2":
+                method = "tcp"
+                readablemethod = "Network/TCP"
+                i = 0
+                while via == "":
+                    if i==3: exitscript()
+                    i += 1
+                    via = input(f"IP/Hostname: ")
+                break
+            elif key == "3":
+                method = "ble"
+                readablemethod = "Bluetooth/BLE"
+                i = 0
+                while via == "":
+                    if i==3: exitscript()
+                    i += 1
+                    via = input(f"Bluetooth MAC address or name: ")
+                break
+            elif key == "4":
+                print(helptext+f"This script can also be used with arguments - run `{Fore.LIGHTBLUE_EX}set-remove_channel.py --help{Fore.RESET}`.")
+                exitscript()
+            elif key == "0" or key == "\x1b": # 0 or esc
+                quit()
+            else:
+                print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3, 4 or 0.{Fore.RESET}")
+
             if i == 3:
                 exitscript()
 
@@ -126,22 +124,19 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         while key not in ("1", "2", "3", "0"):
             key = keypress()
             i += 1
-            match key:
-                case "1":
-                    action = "set"
-                    print(f"*** Mode 1: {Fore.LIGHTBLUE_EX}Add/replace Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't overwrite admin channel! ***\n")
-                case "2":
-                    print(f"*** Mode 2: {Fore.LIGHTBLUE_EX}Delete Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't delete admin channel! ***\n")
-                    action = "del"
-                case "3":
-                    print(f"*** Mode 3: {Fore.LIGHTBLUE_EX}Enable TX{Fore.RESET} ***\n")
-                    action = "tx"
-                case "0":
-                    quit()
-                case "\x1b": #esc key
-                    quit()
-                case _:
-                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3 or 0...{Fore.RESET}")
+            if key == "1":
+                action = "set"
+                print(f"*** Mode 1: {Fore.LIGHTBLUE_EX}Add/replace Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't overwrite admin channel! ***\n")
+            elif key == "2":
+                print(f"*** Mode 2: {Fore.LIGHTBLUE_EX}Delete Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't delete admin channel! ***\n")
+                action = "del"
+            elif key == "3":
+                print(f"*** Mode 3: {Fore.LIGHTBLUE_EX}Enable TX{Fore.RESET} ***\n")
+                action = "tx"
+            elif key == "0" or key == "\x1b":
+                quit()
+            else:
+                print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3 or 0...{Fore.RESET}")
             if i == 3:
                 exitscript()
 
@@ -184,6 +179,17 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 i += 1
                 if key.lower() == "y" or key.lower() == "\r":
                     LoraSettings['use_preset'] = True
+                    presetmap = {
+                        "1": "SHORT_FAST",
+                        "2": "SHORT_SLOW",
+                        "3": "MEDIUM_FAST",
+                        "4": "MEDIUM_SLOW",
+                        "5": "LONG_FAST",
+                        "6": "LONG_MODERATE",
+                        "7": "LONG_SLOW",
+                        "8": "VERY_LONG_SLOW",
+                        "\r": ""
+                    }
                     print(f"""Choose a preset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):
     {Fore.LIGHTBLUE_EX}1.{Fore.RESET} SHORT_FAST
     {Fore.LIGHTBLUE_EX}2.{Fore.RESET} SHORT_SLOW
@@ -196,27 +202,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                     ip = 0
                     LoraSettings['modem_preset'] = None
                     while LoraSettings['modem_preset'] == None:
-                        match keypress():
-                            case "1":
-                                LoraSettings['modem_preset'] = "SHORT_FAST"
-                            case "2":
-                                LoraSettings['modem_preset'] = "SHORT_SLOW"
-                            case "3":
-                                LoraSettings['modem_preset'] = "MEDIUM_FAST"
-                            case "4":
-                                LoraSettings['modem_preset'] = "MEDIUM_SLOW"
-                            case "5":
-                                LoraSettings['modem_preset'] = "LONG_FAST"
-                            case "6":
-                                LoraSettings['modem_preset'] = "LONG_MODERATE"
-                            case "7":
-                                LoraSettings['modem_preset'] = "LONG_SLOW"
-                            case "8":
-                                LoraSettings['modem_preset'] = "VERY_LONG_SLOW"
-                            case "\r":
-                                LoraSettings['modem_preset'] = ""
-                            case _:
-                                LoraSettings['modem_preset'] = None
+                        LoraSettings['modem_preset'] = presetmap.get(keypress(), None)
                         if LoraSettings['modem_preset'] == None:
                             print(f"{Fore.LIGHTRED_EX}You must choose {Fore.LIGHTBLUE_EX}1{Fore.LIGHTRED_EX}-{Fore.LIGHTBLUE_EX}8{Fore.LIGHTRED_EX} or press {Fore.LIGHTBLUE_EX}ENTER{Fore.LIGHTRED_EX}...{Fore.RESET}")
                             ip += 1
@@ -556,12 +542,11 @@ else:
     else:
         LoraSettings['pa_fan_disabled'] = "" #default
     LoraSettings['ignore_incoming'] = args.ignore #comma delineated list
-match action:
-    case "set":
+if action == "set":
         readableaction = "Set Channel"
-    case "del":
+elif action == "del":
         readableaction = "Delete Channel"
-    case "tx":
+elif action == "tx":
         readableaction = "Enable TX"
 
 print(f"\n*** Sending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} over {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET} ***")
@@ -688,9 +673,16 @@ if __name__ == "__main__":
     pub.subscribe(onReceive, "meshtastic.receive")
     
     if len(via) > 0:
-        client = SerialInterface(via)
+        if method == "tcp":
+            client = TCPInterface(via)
+        elif method == "ble":
+            client = BLEInterface(via)
+        else:
+            client = SerialInterface(via)
     else:
         client = SerialInterface()
+        if client.devPath is None:
+            client = TCPInterface("localhost")
 
     sendOnce(client, nodeid)
 
