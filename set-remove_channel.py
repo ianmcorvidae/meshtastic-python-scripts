@@ -2,13 +2,13 @@ import serial.tools.list_ports
 from meshtastic.serial_interface import SerialInterface
 from meshtastic.tcp_interface import TCPInterface
 from meshtastic.ble_interface import BLEInterface
-from meshtastic.util import fromPSK
+from meshtastic.util import fromPSK, findPorts
 from pubsub import pub
 import time
 try:
-    from meshtastic.protobuf import channel_pb2, admin_pb2, portnums_pb2
+    from meshtastic.protobuf import channel_pb2, admin_pb2, portnums_pb2, config_pb2
 except ImportError:
-    from meshtastic import channel_pb2, admin_pb2, portnums_pb2
+    from meshtastic import channel_pb2, admin_pb2, portnums_pb2, config_pb2
 import sys
 import argparse
 import os #OS detect
@@ -17,7 +17,7 @@ from colorama import Fore #colors
 
 #Color scheme:
 #LIGHTRED_EX: errors
-#LIGHTMAGENTA_EX: warnings
+#LIGHTRED_EX: warnings
 #LIGHTBLUE_EX: informational
 #GREEN: only used when script succeeds
 
@@ -45,24 +45,27 @@ requestIds = []
 via = ""
 errormsg = ""
 gotResponse = False
+helptext = f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTRED_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTRED_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script requires installation of the Meshtastic CLI (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/software/python/cli/installation/{Fore.RESET}).\n"""
+
 if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         print(f"""\nConnection method to local node:
     {Fore.LIGHTBLUE_EX}1.{Fore.RESET} USB Serial
     {Fore.LIGHTBLUE_EX}2.{Fore.RESET} Network/TCP
     {Fore.LIGHTBLUE_EX}3.{Fore.RESET} Bluetooth/BLE
+    {Fore.LIGHTBLUE_EX}4.{Fore.RESET} Help
     {Fore.LIGHTBLUE_EX}0.{Fore.RESET} Quit""")
         i = 0
         key = "X" #initial value for keypress detector
         via = "" #port, IP/hostname or BLE mac address/device name
-        while key not in ("1", "2", "3", "0"):
+        while key not in ("1", "2", "3", "4", "0"):
             key = keypress()
             i += 1
             match key:
                 case "1":
                     method = "usb"
                     readablemethod="USB Serial"
-                    availableports = [comport.device for comport in serial.tools.list_ports.comports()] #mian - this does not work on linux. Leaving this one to you. My head hurts.
-                    if len(availableports) > 2:
+                    availableports = findPorts(True) #mian - this does not work on linux. Leaving this one to you. My head hurts.
+                    if len(availableports) > 1:
                         print(f"More than one serial device detected: {Fore.LIGHTBLUE_EX}{availableports}{Fore.RESET}.")
                         if os.name == "nt":
                             prefix = "COM"
@@ -98,12 +101,15 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                         i += 1
                         via = input(f"Bluetooth MAC address or name: ")
                     break
+                case "4":
+                    print(helptext+f"This script can also be used with arguments - run `{Fore.LIGHTBLUE_EX}set-remove_channel.py --help{Fore.RESET}`.")
+                    exitscript()
                 case "0":
                     quit()
                 case "\x1b": #esc key
                     quit()
                 case _:
-                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3 or 0.{Fore.RESET}")
+                    print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3, 4 or 0.{Fore.RESET}")
             if i == 3:
                 exitscript()
 
@@ -123,9 +129,9 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             match key:
                 case "1":
                     action = "set"
-                    print(f"*** Mode 1: {Fore.LIGHTBLUE_EX}Add/replace Channel{Fore.RESET} ***\n*** {Fore.LIGHTMAGENTA_EX}CAREFUL!{Fore.RESET} Don't overwrite admin channel! ***\n")
+                    print(f"*** Mode 1: {Fore.LIGHTBLUE_EX}Add/replace Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't overwrite admin channel! ***\n")
                 case "2":
-                    print(f"*** Mode 2: {Fore.LIGHTBLUE_EX}Delete Channel{Fore.RESET} ***\n*** {Fore.LIGHTMAGENTA_EX}CAREFUL!{Fore.RESET} Don't delete admin channel! ***\n")
+                    print(f"*** Mode 2: {Fore.LIGHTBLUE_EX}Delete Channel{Fore.RESET} ***\n*** {Fore.LIGHTRED_EX}CAREFUL!{Fore.RESET} Don't delete admin channel! ***\n")
                     action = "del"
                 case "3":
                     print(f"*** Mode 3: {Fore.LIGHTBLUE_EX}Enable TX{Fore.RESET} ***\n")
@@ -148,7 +154,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 print(f"{Fore.LIGHTRED_EX}You must enter a nodeID.{Fore.RESET}")
                 if i == 3: exitscript()
 
-        if action == "set" or action == "del": channelnum = input('Channel number (required):\t\t')
+        if action == "set" or action == "del": channelnum = input('Channel number:\t\t')
         if action == "set":
             channelname = input('Channel name:\t\t')
             channelpsk = input('Channel PSK:\t\t')
@@ -156,13 +162,13 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
 
         if action == "tx": #Get LoRa settings from user
             LoraSettings = {}
-            print(f"\n*** Enabling TX remotely requires setting all LoRa settings. All but `{Fore.LIGHTBLUE_EX}Region{Fore.RESET}` can be left blank to use default settings ***\n*** Press {Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to use default value ***")
+            print(f"\nEnabling TX remotely requires setting all LoRa settings (and will wipe all existing LoRa settings).\n*** {Fore.LIGHTRED_EX}Important! Make sure you use settings that are compatible with your local node!{Fore.RESET} ***\nAll but `{Fore.LIGHTBLUE_EX}Region{Fore.RESET}` can be left blank to use default settings.\nPress {Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to use default value.\n")
             
             print(f"Available regions: '{Fore.LIGHTBLUE_EX}ANZ{Fore.RESET}', '{Fore.LIGHTBLUE_EX}CN{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}IN', '{Fore.LIGHTBLUE_EX}JP{Fore.RESET}', '{Fore.LIGHTBLUE_EX}KR{Fore.RESET}', '{Fore.LIGHTBLUE_EX}LORA_24{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_919{Fore.RESET}', '{Fore.LIGHTBLUE_EX}NZ_865{Fore.RESET}', '{Fore.LIGHTBLUE_EX}RU{Fore.RESET}', '{Fore.LIGHTBLUE_EX}SG_923{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TH{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TW{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UNSET{Fore.RESET}', '{Fore.LIGHTBLUE_EX}US{Fore.RESET}'.")
             i = 0
             LoraSettings['region'] = ""
             while LoraSettings['region'] == "":
-                LoraSettings['region'] = input("Region? ").upper()
+                LoraSettings['region'] = input("Region? ")
                 if LoraSettings['region'] == "":
                     print(f"{Fore.LIGHTRED_EX}Region must be specified.{Fore.RESET}")
                 else: break
@@ -177,7 +183,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 key = keypress()
                 i += 1
                 if key.lower() == "y" or key.lower() == "\r":
-                    LoraSettings['use_preset'] = ""
+                    LoraSettings['use_preset'] = True
                     print(f"""Choose a preset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):
     {Fore.LIGHTBLUE_EX}1.{Fore.RESET} SHORT_FAST
     {Fore.LIGHTBLUE_EX}2.{Fore.RESET} SHORT_SLOW
@@ -188,45 +194,44 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
     {Fore.LIGHTBLUE_EX}7.{Fore.RESET} LONG_SLOW
     {Fore.LIGHTBLUE_EX}8.{Fore.RESET} VERY_LONG_SLOW""")
                     ip = 0
-                    LoraSettings['preset'] = None
-                    while LoraSettings['preset'] == None:
+                    LoraSettings['modem_preset'] = None
+                    while LoraSettings['modem_preset'] == None:
                         match keypress():
                             case "1":
-                                LoraSettings['preset'] = "SHORT_FAST"
+                                LoraSettings['modem_preset'] = "SHORT_FAST"
                             case "2":
-                                LoraSettings['preset'] = "SHORT_SLOW"
+                                LoraSettings['modem_preset'] = "SHORT_SLOW"
                             case "3":
-                                LoraSettings['preset'] = "MEDIUM_FAST"
+                                LoraSettings['modem_preset'] = "MEDIUM_FAST"
                             case "4":
-                                LoraSettings['preset'] = "MEDIUM_SLOW"
+                                LoraSettings['modem_preset'] = "MEDIUM_SLOW"
                             case "5":
-                                LoraSettings['preset'] = "LONG_FAST"
+                                LoraSettings['modem_preset'] = "LONG_FAST"
                             case "6":
-                                LoraSettings['preset'] = "LONG_MODERATE"
+                                LoraSettings['modem_preset'] = "LONG_MODERATE"
                             case "7":
-                                LoraSettings['preset'] = "LONG_SLOW"
+                                LoraSettings['modem_preset'] = "LONG_SLOW"
                             case "8":
-                                LoraSettings['preset'] = "VERY_LONG_SLOW"
+                                LoraSettings['modem_preset'] = "VERY_LONG_SLOW"
                             case "\r":
-                                LoraSettings['preset'] = ""
+                                LoraSettings['modem_preset'] = ""
                             case _:
-                                LoraSettings['preset'] = None
-                        if LoraSettings['preset'] == None:
+                                LoraSettings['modem_preset'] = None
+                        if LoraSettings['modem_preset'] == None:
                             print(f"{Fore.LIGHTRED_EX}You must choose {Fore.LIGHTBLUE_EX}1{Fore.LIGHTRED_EX}-{Fore.LIGHTBLUE_EX}8{Fore.LIGHTRED_EX} or press {Fore.LIGHTBLUE_EX}ENTER{Fore.LIGHTRED_EX}...{Fore.RESET}")
                             ip += 1
                         if ip == 3: exitscript()
-                    print()
+                    print(LoraSettings['modem_preset'])
                     break
                 elif key.lower() == "n":
+                    LoraSettings['use_preset'] = False
                     LoraSettings['bandwidth'] = LoraSettings['spread_factor'] = LoraSettings['coding_rate'] = False
                     i2 = 0
                     while not LoraSettings['bandwidth'] or not LoraSettings['spread_factor'] or not LoraSettings['coding_rate']:
-                        LoraSettings['use_preset'] = False
                         print(f"When {Fore.LIGHTBLUE_EX}preset{Fore.RESET} is disabled, {Fore.LIGHTBLUE_EX}bandwidth{Fore.RESET}, {Fore.LIGHTBLUE_EX}spread factor{Fore.RESET} and {Fore.LIGHTBLUE_EX}coding rate{Fore.RESET} are required.")
                         LoraSettings['bandwidth'] = input("Bandwidth: ")
                         LoraSettings['spread_factor'] = input("Spread factor: ")
                         LoraSettings['coding_rate'] = input("Coding rate: ")
-                        LoraSettings['frequency_offset'] = input(f"Frequency offset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
                         if LoraSettings['bandwidth'] and LoraSettings['spread_factor'] and LoraSettings['coding_rate']: break
                         i2 += 1
                         if i2 == 3: 
@@ -240,42 +245,41 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                     print(f"{Fore.LIGHTRED_EX}You must choose y or n...{Fore.RESET}")
                 if i == 3:
                     exitscript()
-            
+
+            LoraSettings['frequency_offset'] = input(f"Frequency offset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
+            print(f"*** {Fore.LIGHTRED_EX}Important: make sure to set enough hops for the acknowledgement to get back to you!{Fore.RESET} ***")
             LoraSettings['hop_limit'] = input(f"Hop limit ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
             LoraSettings['tx_power'] = input(f"TX power ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
-            LoraSettings['freqslot'] = input(f"Frequency slot ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
+            print(f"*** {Fore.LIGHTRED_EX}Important: if you have a non default primary channel, frequency slot likely needs to be set!{Fore.RESET} ***")
+            LoraSettings['channel_num'] = input(f"Frequency slot ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
             LoraSettings['override_frequency'] = input(f"Override frequency ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\t")
 
-            LoraSettings['override_duty_cycle'] = input(f"Override duty cycle ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
-            if LoraSettings['override_duty_cycle'].lower() == "y": #if user presses y, set to true. Any other key, leave blank
+            if input(f"Override duty cycle ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET}) ").lower() == "y": #if user presses y, set to true. Any other key, false
                 LoraSettings['override_duty_cycle'] = True
             else:
-                LoraSettings['override_duty_cycle'] = ""
+                LoraSettings['override_duty_cycle'] = False
 
-            LoraSettings['sx126x_rx_boosted_gain'] = input(f"Enable SX126X RX boosted gain ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
-            if LoraSettings['sx126x_rx_boosted_gain'].lower() == "n": #if user presses n, set to false. Any other key, leave blank
-                LoraSettings['sx126x_rx_boosted_gain'] == False
+            if input(f"Enable SX126X RX boosted gain ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET}) ") == "n": #if user presses n, set to false. Any other key, True
+                LoraSettings['sx126x_rx_boosted_gain'] = False
             else:
-                LoraSettings['sx126x_rx_boosted_gain'] == ""
+                LoraSettings['sx126x_rx_boosted_gain'] = True
 
-            LoraSettings['ignore_mqtt'] = input(f"Ignore MQTT ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
-            if LoraSettings['ignore_mqtt'].lower() == "y": #as this value changes by region, it requires special handling - if the user skips this setting, it'll be left blank
-                LoraSettings['sx126x_rx_boosted_gain'] == True
-            elif LoraSettings['sx126x_rx_boosted_gain'] == "n":
-                LoraSettings['sx126x_rx_boosted_gain'] == False
+            if input(f"Ignore MQTT ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET}) ").lower() == "y": #as this value changes by region, it requires special handling - if the user skips this setting, it'll be left blank
+                LoraSettings['ignore_mqtt'] = True
+            elif LoraSettings['ignore_mqtt'] == "n":
+                LoraSettings['ignore_mqtt'] = False
             else:
-                LoraSettings['sx126x_rx_boosted_gain'] == ""
+                LoraSettings['ignore_mqtt'] = ""
 
-            LoraSettings['pa_fan_disabled'] = input(f"Disable PA Fan ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})") #if user presses y, set to true. Any other key, set to default (false)
-            if LoraSettings['pa_fan_disabled'].lower() == "y": 
-                LoraSettings['pa_fan_disabled'] == True
+            if input(f"Disable PA Fan ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip)? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET}) ").lower() == "y": #if user presses y, set to true. Any other key, set to default (false)
+                LoraSettings['pa_fan_disabled'] = True
             else:
-                LoraSettings['pa_fan_disabled'] == ""
+                LoraSettings['pa_fan_disabled'] = False
 
-            LoraSettings['ignore_incoming'] = input(f"Ignore list. Up to three comma-delineated nodeID's. Example: `{Fore.LIGHTBLUE_EX}!nodeid01,!nodeid02,!nodeid03{Fore.RESET}` ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip): ")
+            LoraSettings['ignore_incoming'] = input(f"Ignore list. Up to three comma delineated nodeID's. Example: `{Fore.LIGHTBLUE_EX}!nodeid01,!nodeid02,!nodeid03{Fore.RESET}` ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip): ")
 
-            print(LoraSettings)
-        print(f"\nSend command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
+        print("\n"+', '.join(f'{Fore.LIGHTBLUE_EX}{key}{Fore.RESET}: {value if value != "" else "default"}' for key, value in LoraSettings.items()))
+        print(f"Send command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
         i = 0
         key = "X" #initial value for keypress detector
         while key.lower() not in ("y", "n"):
@@ -297,7 +301,7 @@ else:
     parser = argparse.ArgumentParser(
             add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog=f"{Fore.LIGHTBLUE_EX}This is a script to add/set or delete a channel remotely.\nMeshtastic apps are not able to reliably alter channels remotely (via admin channel) due to their requirement to get all remote channels before changing them.\nThis script skips getting the channels from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node (see https://meshtastic.org/docs/configuration/remote-admin/)\n*** {Fore.LIGHTMAGENTA_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.LIGHTBLUE_EX} ***{Fore.LIGHTMAGENTA_EX}\nLeave channel list contiguous!{Fore.LIGHTBLUE_EX} Deleting middle channels may lead to unexpected behaviors.\nThis script can also be used WITHOUT any arguments - in this case, it will give prompts.{Fore.RESET}")
+            epilog=helptext + f"This script can also be used WITHOUT any arguments - in this case, it will give prompts.")
 
     helpGroup = parser.add_argument_group("Help")
     helpGroup.add_argument("-h", "--help", action="help", help="Show this help message and exit.")
@@ -370,14 +374,14 @@ else:
         default="",
     )
 
-    loraset = parser.add_argument_group('LoRa settings', 'Region is REQUIRED if enabling TX - the rest can be specified or left as default. Not used with Set and Delete commands.')
+    loraset = parser.add_argument_group('LoRa settings', f'Region is REQUIRED if enabling TX - the rest can be specified or left as default. Not used with Set and Delete commands.\n*** {Fore.LIGHTRED_EX}Important! Make sure you use settings that are compatible with your local node!{Fore.RESET} ***\nFor more information on LoRa settings: {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/radio/lora/{Fore.RESET}')
     loraset.add_argument(
         "--region",
         help=f"This is always required if enabling TX. Options: ['{Fore.LIGHTBLUE_EX}ANZ{Fore.RESET}', '{Fore.LIGHTBLUE_EX}CN{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}IN', '{Fore.LIGHTBLUE_EX}JP{Fore.RESET}', '{Fore.LIGHTBLUE_EX}KR{Fore.RESET}', '{Fore.LIGHTBLUE_EX}LORA_24{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_919{Fore.RESET}', '{Fore.LIGHTBLUE_EX}NZ_865{Fore.RESET}', '{Fore.LIGHTBLUE_EX}RU{Fore.RESET}', '{Fore.LIGHTBLUE_EX}SG_923{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TH{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TW{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UNSET{Fore.RESET}', '{Fore.LIGHTBLUE_EX}US{Fore.RESET}'].",
         default=None,
     )
     loraset.add_argument(  #note that this is the opposite of the usual (argument is used to disable preset, not enable)
-        "--presetoff",
+        "--nopreset",
         help="Don't use modem preset. Default (disabled) if not included.",
         default="",
         action='store_true'
@@ -387,7 +391,7 @@ else:
         help="Which modem preset to use. Default (LONG_FAST) if left blank.",
         choices=['SHORT_FAST','SHORT_SLOW','MEDIUM_FAST','MEDIUM_SLOW','LONG_FAST','LONG_MODERATE','LONG_SLOW','VERY_LONG_SLOW'],
         metavar="PRESET",
-        default='',
+        default="",
     )
     loraset.add_argument(
         "--bandwidth",
@@ -406,12 +410,12 @@ else:
     )
     loraset.add_argument(
         "--freqoffset",
-        help="LoRa frequency offset. Only used if not using LoRa preset. Default (0) if not included.",
+        help="LoRa frequency offset. Default (0) if not included.",
         default="",
     )
     loraset.add_argument(
         "--hoplimit",
-        help="Hop limit. Default (3) if not included.",
+        help=f"Hop limit. Default (3) if not included. {Fore.LIGHTRED_EX}Important: make sure to set enough hops for the acknowledgement to get back to you!{Fore.RESET}",
         default="",
     )
     loraset.add_argument(
@@ -421,7 +425,7 @@ else:
     )
     loraset.add_argument(
         "--freqslot",
-        help="Frequency slot. Default (changes according to region and primary channel name) if not included.",
+        help=f"Frequency slot. Default (changes according to region and primary channel name) if not included. {Fore.LIGHTRED_EX}Important: if you have a non default primary channel, this likely needs to be set!{Fore.RESET}",
         default="",
     )
     loraset.add_argument(
@@ -438,7 +442,7 @@ else:
     loraset.add_argument( #note that this is the opposite of the usual (argument is used to disable preset, not enable)
         "--sx126xoff",
         help="Disable SX126X RX boosted gain. Default (disabled) if not included.",
-        default="",
+        default=False,
         action='store_true'
     )
     loraset.add_argument(
@@ -449,14 +453,14 @@ else:
     )
     loraset.add_argument(
         "--pafanoff",
-        help="Disables PA (power amplifier) fan. Default (disabled) if not included.",
+        help="Disables PA (power amplifier) fan. Default (disabled) if not included. NOT YET IMPLEMENTED.",
         default="",
         action='store_true',
     )
     loraset.add_argument(
         "--ignore",
         help="Ignore list. Default (none) if left blank. Up to three comma-delineated nodeID's including !. Example: `!nodeid01,!nodeid02,!nodeid03`.",
-        default="",
+        default=None,
     )
     
 
@@ -488,9 +492,10 @@ else:
         if not args.region:
             i += 1
             errormsg += f"{i}. When `{Fore.LIGHTBLUE_EX}--tx{Fore.RESET}` is used, `{Fore.LIGHTBLUE_EX}--region{Fore.RESET}` must be specified.\n"
-        if args.presetoff == True & (not args.bandwidth or not args.spread or not args.codingrate):
+        if args.nopreset == True & (not args.bandwidth or not args.spread or not args.codingrate):
             i += 1
-            errormsg += f"{i}. When using `{Fore.LIGHTBLUE_EX}--tx{Fore.RESET}` and `{Fore.LIGHTBLUE_EX}--presetoff{Fore.RESET}` is used, `{Fore.LIGHTBLUE_EX}--bandwidth{Fore.RESET}`, `{Fore.LIGHTBLUE_EX}--spread{Fore.RESET}` and `{Fore.LIGHTBLUE_EX}--codingrate{Fore.RESET}` must be specified.\n"
+            errormsg += f"{i}. When using `{Fore.LIGHTBLUE_EX}--tx{Fore.RESET}` and `{Fore.LIGHTBLUE_EX}--nopreset{Fore.RESET}` is used, `{Fore.LIGHTBLUE_EX}--bandwidth{Fore.RESET}`, `{Fore.LIGHTBLUE_EX}--spread{Fore.RESET}` and `{Fore.LIGHTBLUE_EX}--codingrate{Fore.RESET}` must be specified.\n"
+        action = "tx"
 
     if errormsg != "": exitscript()
 
@@ -506,10 +511,12 @@ else:
         method = "usb"
         readablemethod = "Bluetooth/BLE"
 
-    if args.delete: #set the action variable
-        action="del"
-    else:
-        action="set"
+    if args.set: #set the action variable
+        action = "set"
+    elif args.delete:
+        action = "del"
+    elif args.tx:
+        action = "tx"
     
     if args.nodeid:
         nodeid = args.nodeid
@@ -518,27 +525,37 @@ else:
     else:
         nodeid = "!" + f"{int(args.nodenum):x}" #if nodenum was used, convert it to hex for nodeid
 
+    ### Convert arguments to variables with proper names to match meshtastic protobuffs
     channelnum = args.channum
     channelname = args.name
     channelpsk = args.psk
     LoraSettings = {}
     LoraSettings['region'] = args.region
-    if args.presetoff != "": LoraSettings['use_preset'] = not args.presetoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
-    LoraSettings['preset'] = args.preset
+    print("args.nopreset",args.nopreset)
+    if args.nopreset:
+        LoraSettings['use_preset'] = False #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
+    else:
+        LoraSettings['use_preset'] = True #default
+    LoraSettings['modem_preset'] = args.preset
     LoraSettings['bandwidth'] = args.bandwidth
     LoraSettings['spread_factor'] = args.spread
     LoraSettings['coding_rate'] = args.codingrate
     LoraSettings['frequency_offset'] = args.freqoffset
     LoraSettings['hop_limit'] = args.hoplimit
     LoraSettings['tx_power'] = args.txpwr
-    LoraSettings['freqslot'] = args.freqslot
+    LoraSettings['channel_num'] = args.freqslot
     LoraSettings['override_frequency'] = args.overfreq
     LoraSettings['override_duty_cycle'] = args.overduty
-    if args.sx126xoff != "": LoraSettings['sx126x_rx_boosted_gain'] = not args.sx126xoff #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
+    if args.sx126xoff:
+        LoraSettings['sx126x_rx_boosted_gain'] = False #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
+    else:
+        LoraSettings['sx126x_rx_boosted_gain'] = True #default
     LoraSettings['ignore_mqtt'] = args.ignoremqtt
-    LoraSettings['pa_fan_disabled'] = args.pafanoff
+    if args.pafanoff:
+        LoraSettings['pa_fan_disabled'] = True
+    else:
+        LoraSettings['pa_fan_disabled'] = "" #default
     LoraSettings['ignore_incoming'] = args.ignore #comma delineated list
-    print(LoraSettings)
 match action:
     case "set":
         readableaction = "Set Channel"
@@ -551,7 +568,20 @@ print(f"\n*** Sending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" comman
 print("Will retry until acknowledgment is received...")
 
 if action == "set": #we're adding/setting a channel
-    def make_channel(index=int(channelnum), role=channel_pb2.Channel.Role.SECONDARY, name=channelname, psk="base64:" + channelpsk):
+    def build_command(index=int(channelnum), role=channel_pb2.Channel.Role.SECONDARY, name=channelname, psk="base64:" + channelpsk):
+        ch = channel_pb2.Channel()
+        ch.role = role
+        ch.index = index
+        if role != channel_pb2.Channel.Role.DISABLED:
+            if name is not None:
+                ch.settings.name = name
+            if psk == "base64:":
+                psk += "AQ==" #fixes bug when setting channel 0 with no PSK (caused node reboot)
+            if psk is not None:
+                ch.settings.psk = fromPSK(psk)
+        return ch
+elif action == "del": #we're deleting a channel
+    def build_command(index=int(channelnum), role=channel_pb2.Channel.Role.DISABLED, name=None, psk=None):
         ch = channel_pb2.Channel()
         ch.role = role
         ch.index = index
@@ -561,18 +591,28 @@ if action == "set": #we're adding/setting a channel
             if psk is not None:
                 ch.settings.psk = fromPSK(psk)
         return ch
-else: #we're deleting a channel
-    def make_channel(index=int(channelnum), role=channel_pb2.Channel.Role.DISABLED, name=None, psk=None):
-        ch = channel_pb2.Channel()
-        ch.role = role
-        ch.index = index
-        if role != channel_pb2.Channel.Role.DISABLED:
-            if name is not None:
-                ch.settings.name = name
-            if psk is not None:
-                ch.settings.psk = fromPSK(psk)
-        return ch
-
+elif action == "tx": #we're enabling tx
+    def build_command():
+        command = config_pb2.Config.LoRaConfig()
+        command.region = config_pb2.Config.LoRaConfig.RegionCode.Value(LoraSettings['region'].upper())
+        if LoraSettings['use_preset']: command.use_preset = LoraSettings['use_preset']
+        if LoraSettings['modem_preset']: command.modem_preset = config_pb2.Config.LoRaConfig.ModemPreset.Value(LoraSettings['modem_preset'])
+        if LoraSettings['bandwidth']: command.bandwidth = int(LoraSettings['bandwidth'])
+        if LoraSettings['spread_factor']: command.spread_factor = int(LoraSettings['spread_factor'])
+        if LoraSettings['coding_rate']: command.coding_rate = int(LoraSettings['coding_rate'])
+        if LoraSettings['frequency_offset']: command.frequency_offset = int(LoraSettings['frequency_offset'])
+        if LoraSettings['hop_limit']: command.hop_limit = int(LoraSettings['hop_limit'])
+        if LoraSettings['tx_power']: command.tx_power = int(LoraSettings['tx_power'])
+        if LoraSettings['channel_num']: command.channel_num = int(LoraSettings['channel_num']) #frequency slot
+        if LoraSettings['override_frequency']: command.override_frequency = int(LoraSettings['override_frequency'])
+        if LoraSettings['override_duty_cycle']: command.override_duty_cycle = LoraSettings['override_duty_cycle']
+        if LoraSettings['sx126x_rx_boosted_gain']: command.sx126x_rx_boosted_gain = LoraSettings['sx126x_rx_boosted_gain']
+        if LoraSettings['ignore_mqtt']: command.ignore_mqtt = LoraSettings['ignore_mqtt']
+        command.tx_enabled = True #the meat and potatoes
+        #ch.pa_fan_disabled = LoraSettings['pa_fan_disabled'] #waiting for library implementation
+        command.ignore_incoming.extend([int(x.strip("!"),16) for x in LoraSettings['ignore_incoming'].split(",")])
+        print(command.ignore_incoming)
+        return command
 
 ### The actual mesh code
 
@@ -580,12 +620,16 @@ def printable_packet(packet):
     ret = f"""
     Packet ID:\t{Fore.LIGHTBLUE_EX}{packet['id']}{Fore.RESET}
     From:\t{Fore.LIGHTBLUE_EX}{packet['from']:08x}{Fore.RESET} (remote node)
-    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)
-    Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
+    To:\t\t{Fore.LIGHTBLUE_EX}{packet['to']:08x}{Fore.RESET} (you)"""
+    #Portnum:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['portnum']}{Fore.RESET}"""
     if 'requestId' in packet['decoded']:
         ret += f"\n    Request ID:\t{Fore.LIGHTBLUE_EX}{packet['decoded']['requestId']}{Fore.RESET}"
     if packet['decoded']['portnum'] == 'ROUTING_APP':
-        ret += f"\n    Error:\t{Fore.LIGHTRED_EX}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
+        if not packet['decoded']['routing']['errorReason'] == "NONE":
+            colorstart = f"{Fore.LIGHTRED_EX}"
+        else:
+            colorstart = f"{Fore.LIGHTBLUE_EX}"
+        ret += f"\n    Error:\t{colorstart}{packet['decoded']['routing']['errorReason']}{Fore.RESET}"
     return ret
 
 def onReceive(packet, interface):
@@ -600,8 +644,8 @@ def onReceive(packet, interface):
                         print(f"{Fore.GREEN}Received acknowledgement:{Fore.RESET} {printable_packet(packet)}")
                         gotResponse = True
                         print(f"\n***************    {Fore.GREEN}SUCCESS{Fore.RESET}    ***************")
-                        print(f"*** Received acknowledgement of channel {channelnum} ***")
-                        print(f"************** Took {attempts} attempts **************")
+                        print(f"*** Received acknowledgement of channel {Fore.LIGHTBLUE_EX}{channelnum}{Fore.RESET} ***")
+                        print(f"************** Took {Fore.LIGHTBLUE_EX}{attempts}{Fore.RESET} attempts **************")
                 else:
                     print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
                     #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
@@ -625,15 +669,18 @@ def sendAdmin(client, packet, nodeid):
     )
 
 def sendOnce(client, nodeid, *args, **kwargs):
-    ch = make_channel(*args, **kwargs)
+    ch = build_command(*args, **kwargs)
 
     p = admin_pb2.AdminMessage()
-    p.set_channel.CopyFrom(ch)
+    if action == "add" or action == "del":
+        p.set_channel.CopyFrom(ch)
+    elif action == "tx":
+        p.set_config.lora.CopyFrom(build_command())
 
     pkt = sendAdmin(client, p, nodeid)
 
     requestIds.append(pkt.id)
-    print(f"{Fore.LIGHTBLUE_EX}Sent channel to remote node (packet ID: {pkt.id}){Fore.RESET}")
+    print(f"{Fore.LIGHTBLUE_EX}Sent command to remote node (packet ID: {pkt.id}).{Fore.RESET}")
     print("Waiting for acknowledgement...")
 
 if __name__ == "__main__":
@@ -645,14 +692,17 @@ if __name__ == "__main__":
     else:
         client = SerialInterface()
 
-    sendOnce(client, nodeid, index=int(channelnum))
+    sendOnce(client, nodeid)
 
     i = 0
     attempts = 1
     while not gotResponse:
         if i >= 30:
             print(f"{Fore.LIGHTRED_EX}Timed out, retrying... (attempt #{attempts}){Fore.RESET}")
-            sendOnce(client, nodeid, index=int(channelnum))
+            if action == "set" or action == "del":
+                sendOnce(client, nodeid, index=int(channelnum))
+            else:
+                sendOnce(client, nodeid)
             attempts += 1
             i = 0
         time.sleep(1)
