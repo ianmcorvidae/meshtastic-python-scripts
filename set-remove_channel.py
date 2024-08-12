@@ -159,7 +159,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             LoraSettings = {}
             print(f"\nEnabling TX remotely requires setting all LoRa settings (and will wipe all existing LoRa settings).\n*** {Fore.LIGHTRED_EX}Important! Make sure you use settings that are compatible with your local node!{Fore.RESET} ***\nAll but `{Fore.LIGHTBLUE_EX}Region{Fore.RESET}` can be left blank to use default settings.\nPress {Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to use default value.\n")
             
-            print(f"Available regions: '{Fore.LIGHTBLUE_EX}ANZ{Fore.RESET}', '{Fore.LIGHTBLUE_EX}CN{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}IN', '{Fore.LIGHTBLUE_EX}JP{Fore.RESET}', '{Fore.LIGHTBLUE_EX}KR{Fore.RESET}', '{Fore.LIGHTBLUE_EX}LORA_24{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_919{Fore.RESET}', '{Fore.LIGHTBLUE_EX}NZ_865{Fore.RESET}', '{Fore.LIGHTBLUE_EX}RU{Fore.RESET}', '{Fore.LIGHTBLUE_EX}SG_923{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TH{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TW{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UNSET{Fore.RESET}', '{Fore.LIGHTBLUE_EX}US{Fore.RESET}'.")
+            print("Available regions: " + ", ".join([f"'{Fore.LIGHTBLUE_EX}{x}{Fore.RESET}'" for x in config_pb2.Config.LoRaConfig.RegionCode.keys() if x != "UNSET"]) + ".")
             i = 0
             LoraSettings['region'] = ""
             while LoraSettings['region'] == "":
@@ -179,7 +179,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                 i += 1
                 if key.lower() == "y" or key.lower() == "\r":
                     LoraSettings['use_preset'] = True
-                    presetmap = {
+                    presetMap = {
                         "1": "SHORT_FAST",
                         "2": "SHORT_SLOW",
                         "3": "MEDIUM_FAST",
@@ -190,19 +190,12 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                         "8": "VERY_LONG_SLOW",
                         "\r": ""
                     }
-                    print(f"""Choose a preset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):
-    {Fore.LIGHTBLUE_EX}1.{Fore.RESET} SHORT_FAST
-    {Fore.LIGHTBLUE_EX}2.{Fore.RESET} SHORT_SLOW
-    {Fore.LIGHTBLUE_EX}3.{Fore.RESET} MEDIUM_FAST
-    {Fore.LIGHTBLUE_EX}4.{Fore.RESET} MEDIUM_SLOW
-    {Fore.LIGHTBLUE_EX}5.{Fore.RESET} LONG_FAST (default)
-    {Fore.LIGHTBLUE_EX}6.{Fore.RESET} LONG_MODERATE
-    {Fore.LIGHTBLUE_EX}7.{Fore.RESET} LONG_SLOW
-    {Fore.LIGHTBLUE_EX}8.{Fore.RESET} VERY_LONG_SLOW""")
+                    print(f"Choose a preset ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip):\n" + 
+                            "\n".join(f"{Fore.LIGHTBLUE_EX}{x[0]}.{Fore.RESET} {x[1]}{' (default)' if x[1] == 'LONG_FAST' else ''}" for x in presetMap.items() if x[0] != "\r"))
                     ip = 0
                     LoraSettings['modem_preset'] = None
                     while LoraSettings['modem_preset'] == None:
-                        LoraSettings['modem_preset'] = presetmap.get(keypress(), None)
+                        LoraSettings['modem_preset'] = presetMap.get(keypress(), None)
                         if LoraSettings['modem_preset'] == None:
                             print(f"{Fore.LIGHTRED_EX}You must choose {Fore.LIGHTBLUE_EX}1{Fore.LIGHTRED_EX}-{Fore.LIGHTBLUE_EX}8{Fore.LIGHTRED_EX} or press {Fore.LIGHTBLUE_EX}ENTER{Fore.LIGHTRED_EX}...{Fore.RESET}")
                             ip += 1
