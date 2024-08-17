@@ -39,13 +39,23 @@ def keypress(): #input single character, cross-platform
 
 def exitscript():
     print(f"{errormsg}{Fore.LIGHTRED_EX}Quitting...{Fore.RESET}")
+    try:
+        args
+    except:
+        print(f"\n{Fore.LIGHTBLUE_EX}Press any key to exit...{Fore.RESET}")
+        keypress()
+    try:
+        client.close()
+    except:
+        ""
     quit()
 
 requestIds = []
+maxattempts = 25
 via = ""
 errormsg = ""
 gotResponse = False
-helptext = f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry until it succeeds.\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTRED_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTRED_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script requires installation of the Meshtastic CLI (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/software/python/cli/installation/{Fore.RESET}).\n"""
+helptext = f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry up to 25 times until it succeeds (configurable in argument mode).\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTRED_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTRED_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script requires installation of the Meshtastic CLI (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/software/python/cli/installation/{Fore.RESET}).\n"""
 
 if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         print(f"""\nConnection method to local node:
@@ -103,7 +113,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             elif key == "4":
                 print(helptext+f"This script can also be used with arguments - run `{Fore.LIGHTBLUE_EX}set-remove_channel.py --help{Fore.RESET}`.")
                 exitscript()
-            elif key == "0" or key == "\x1b": # 0 or esc
+            elif key == "0" or key == "\x1b": #0 or esc
                 quit()
             else:
                 print(f"{Fore.LIGHTRED_EX}You must choose 1, 2, 3, 4 or 0.{Fore.RESET}")
@@ -257,8 +267,11 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
 
             LoraSettings['ignore_incoming'] = input(f"Ignore list. Up to three comma delineated nodeID's. Example: `{Fore.LIGHTBLUE_EX}!nodeid01,!nodeid02,!nodeid03{Fore.RESET}` ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip): ")
 
-        print("\n"+', '.join(f'{Fore.LIGHTBLUE_EX}{key}{Fore.RESET}: {value if value != "" else "default"}' for key, value in LoraSettings.items()))
-        print(f"Send command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
+        try:
+            print("\n"+', '.join(f'{Fore.LIGHTBLUE_EX}{key}{Fore.RESET}: {value if value != "" else "default"}' for key, value in LoraSettings.items()))
+        except:
+            ""
+        """print(f"Send command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
         i = 0
         key = "X" #initial value for keypress detector
         while key.lower() not in ("y", "n"):
@@ -273,7 +286,7 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
             else:
                 print(f"{Fore.LIGHTRED_EX}You must choose y or n...{Fore.RESET}")
             if i == 3:
-                exitscript()
+                exitscript()"""
 else:
     #argument mode
     ### Add arguments to parse
@@ -302,6 +315,20 @@ else:
         "--bt",
         help="The Bluetooth device MAC address or name to connect to. NOT YET IMPLEMENTED.",
         default=None,
+    )
+
+    options = parser.add_argument_group("Options")
+    options.add_argument(
+        "--attempts",
+        metavar="#",
+        help=f"Maximum number of retries. Default: {Fore.LIGHTBLUE_EX}25{Fore.RESET}. Configurable via argument only.",
+        default=25,
+    )
+    options.add_argument(
+        "--confirm",
+        help=f"Confirm before sending command. Will display name of remote node if present in nodeDB. Default: off in argument mode. Always on in prompt mode.",
+        default=False,
+        action='store_true'
     )
 
     action = parser.add_argument_group('Command', 'What command are we sending? Choose one [REQUIRED].')
@@ -356,7 +383,7 @@ else:
     loraset = parser.add_argument_group('LoRa settings', f'Region is REQUIRED if enabling TX - the rest can be specified or left as default. Not used with Set and Delete commands.\n*** {Fore.LIGHTRED_EX}Important! Make sure you use settings that are compatible with your local node!{Fore.RESET} ***\nFor more information on LoRa settings: {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/radio/lora/{Fore.RESET}')
     loraset.add_argument(
         "--region",
-        help=f"This is always required if enabling TX. Options: ['{Fore.LIGHTBLUE_EX}ANZ{Fore.RESET}', '{Fore.LIGHTBLUE_EX}CN{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}EU_868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}IN', '{Fore.LIGHTBLUE_EX}JP{Fore.RESET}', '{Fore.LIGHTBLUE_EX}KR{Fore.RESET}', '{Fore.LIGHTBLUE_EX}LORA_24{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}MY_919{Fore.RESET}', '{Fore.LIGHTBLUE_EX}NZ_865{Fore.RESET}', '{Fore.LIGHTBLUE_EX}RU{Fore.RESET}', '{Fore.LIGHTBLUE_EX}SG_923{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TH{Fore.RESET}', '{Fore.LIGHTBLUE_EX}TW{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA_433{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UA868{Fore.RESET}', '{Fore.LIGHTBLUE_EX}UNSET{Fore.RESET}', '{Fore.LIGHTBLUE_EX}US{Fore.RESET}'].",
+        help=f"This is always required if enabling TX. Options: "+", ".join([f"'{Fore.LIGHTBLUE_EX}{x}{Fore.RESET}'" for x in config_pb2.Config.LoRaConfig.RegionCode.keys() if x != "UNSET"])+".",
         default=None,
     )
     loraset.add_argument(  #note that this is the opposite of the usual (argument is used to disable preset, not enable)
@@ -384,7 +411,7 @@ else:
     )
     loraset.add_argument(
         "--codingrate",
-        help="LoRa bandwidth. REQUIRED if not using LoRa preset.",
+        help="LoRa coding rate. REQUIRED if not using LoRa preset.",
         default="",
     )
     loraset.add_argument(
@@ -467,6 +494,7 @@ else:
                 except:
                     i += 1
                     errormsg += f"{i}. Channel number must be an integer (whole number).\n"
+    maxattempts = int(args.attempts)
     if args.tx:
         if not args.region:
             i += 1
@@ -488,7 +516,7 @@ else:
         readablemethod = "Network/TCP"
     else:
         method = "usb"
-        readablemethod = "Bluetooth/BLE"
+        readablemethod = "Serial/USB"
 
     if args.set: #set the action variable
         action = "set"
@@ -510,7 +538,6 @@ else:
     channelpsk = args.psk
     LoraSettings = {}
     LoraSettings['region'] = args.region
-    print("args.nopreset",args.nopreset)
     if args.nopreset:
         LoraSettings['use_preset'] = False #This inverts the value to conform with meshtastic, as the argument is backwards (argument disables rather than enables)
     else:
@@ -542,8 +569,49 @@ elif action == "del":
 elif action == "tx":
         readableaction = "Enable TX"
 
-print(f"\n*** Sending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} over {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET} ***")
-print("Will retry until acknowledgment is received...")
+
+
+if len(via) > 0:
+    if method == "tcp":
+        client = TCPInterface(via)
+    elif method == "ble":
+        client = BLEInterface(via)
+    else:
+        client = SerialInterface(via)
+else:
+    client = SerialInterface()
+    if client.devPath is None:
+        client = TCPInterface("localhost")
+
+for key, value in client.nodes.items():
+    if key == nodeid:
+        nodeName = value.get('user', {}).get('longName', f'{Fore.LIGHTRED_EX}node name not found in nodeDB{Fore.RESET}')
+        break
+else:
+    nodeName = f'{Fore.LIGHTRED_EX}node ID not in nodeDB{Fore.RESET}'
+
+
+
+
+if len(sys.argv) == 1 or args.confirm: #in prompt mode, ask for confirmation.
+    print(f"Send command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({nodeName})? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
+    i = 0
+    key = "X" #initial value for keypress detector
+    while key.lower() not in ("y", "n"):
+        key = keypress()
+        i += 1
+        if key.lower() == "y":
+            break
+        elif key.lower() == "n":
+            exitscript()
+        elif key == "\x1b": #esc key
+                quit()
+        else:
+            print(f"{Fore.LIGHTRED_EX}You must choose y or n...{Fore.RESET}")
+        if i == 3:
+            exitscript()
+
+print(f"\nSending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({Fore.LIGHTBLUE_EX}{nodeName}{Fore.RESET}) over {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET}. Will retry up to {Fore.LIGHTBLUE_EX}{maxattempts}{Fore.RESET} times until acknowledgment is received...\n")
 
 if action == "set": #we're adding/setting a channel
     def build_command(index=int(channelnum), role=channel_pb2.Channel.Role.SECONDARY, name=channelname, psk="base64:" + channelpsk):
@@ -576,20 +644,22 @@ elif action == "tx": #we're enabling tx
         if LoraSettings['use_preset']: command.use_preset = LoraSettings['use_preset']
         if LoraSettings['modem_preset']: command.modem_preset = config_pb2.Config.LoRaConfig.ModemPreset.Value(LoraSettings['modem_preset'])
         if LoraSettings.get('bandwidth'): command.bandwidth = int(LoraSettings['bandwidth'])
-        if LoraSettings.get('spread_factor'): command.spread_factor = int(LoraSettings['spread_factor'])
-        if LoraSettings.get('coding_rate'): command.coding_rate = int(LoraSettings['coding_rate'])
-        if LoraSettings['frequency_offset']: command.frequency_offset = int(LoraSettings['frequency_offset'])
+        if LoraSettings.get('spread_factor'): command.spread_factor = int(LoraSettings['spread_factor']) #should this be a string?
+        if LoraSettings.get('coding_rate'): command.coding_rate = int(LoraSettings['coding_rate']) #should this be a string?
+        if LoraSettings['frequency_offset']: command.frequency_offset = float(LoraSettings['frequency_offset'])
         if LoraSettings['hop_limit']: command.hop_limit = int(LoraSettings['hop_limit'])
         if LoraSettings['tx_power']: command.tx_power = int(LoraSettings['tx_power'])
         if LoraSettings['channel_num']: command.channel_num = int(LoraSettings['channel_num']) #frequency slot
-        if LoraSettings['override_frequency']: command.override_frequency = int(LoraSettings['override_frequency'])
+        if LoraSettings['override_frequency']: command.override_frequency = float(LoraSettings['override_frequency'])
         if LoraSettings['override_duty_cycle']: command.override_duty_cycle = LoraSettings['override_duty_cycle']
         if LoraSettings['sx126x_rx_boosted_gain']: command.sx126x_rx_boosted_gain = LoraSettings['sx126x_rx_boosted_gain']
         if LoraSettings['ignore_mqtt']: command.ignore_mqtt = LoraSettings['ignore_mqtt']
         command.tx_enabled = True #the meat and potatoes
         #ch.pa_fan_disabled = LoraSettings['pa_fan_disabled'] #waiting for library implementation
-        command.ignore_incoming.extend([int(x.strip("!"),16) for x in LoraSettings['ignore_incoming'].split(",")])
-        print(command.ignore_incoming)
+        try:
+            command.ignore_incoming.extend([int(x.strip("!"),16) for x in LoraSettings['ignore_incoming'].split(",")])
+        except:
+            ""
         return command
 
 ### The actual mesh code
@@ -628,7 +698,10 @@ def onReceive(packet, interface):
                     print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
                     #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
                     if packet['decoded']['routing']['errorReason'] == "NO_CHANNEL": print(f"`Error: NO_CHANNEL` indicates that you do not have an admin channel in common with the remote node.\nFor more information, see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}")
-                    gotResponse = True
+                    if packet['decoded']['routing']['errorReason'] == "MAX_RETRANSMIT":
+                        print(f"`Error: MAX_RETRANSMIT` Is a nonfatal error that is triggered when no packet relay or acknowledgement is received. It indicates that no other nodes are in range.")
+                    else:
+                        gotResponse = True
             #else:
                 #print(f"{packet['id']}\t|| got response for different packet: {packet['decoded']['requestId']}")
         #else:
@@ -650,7 +723,7 @@ def sendOnce(client, nodeid, *args, **kwargs):
     ch = build_command(*args, **kwargs)
 
     p = admin_pb2.AdminMessage()
-    if action == "add" or action == "del":
+    if action == "set" or action == "del":
         p.set_channel.CopyFrom(ch)
     elif action == "tx":
         p.set_config.lora.CopyFrom(build_command())
@@ -665,7 +738,7 @@ if __name__ == "__main__":
 
     pub.subscribe(onReceive, "meshtastic.receive")
     
-    if len(via) > 0:
+    """ if len(via) > 0:
         if method == "tcp":
             client = TCPInterface(via)
         elif method == "ble":
@@ -677,18 +750,29 @@ if __name__ == "__main__":
         if client.devPath is None:
             client = TCPInterface("localhost")
 
+    for key, value in client.nodes.items():
+        if key == nodeid:
+            long_name = value.get('user', {}).get('longName', 'node name not found in nodeDB')
+            break
+    else:
+        long_name = 'node ID not in nodeDB'"""
+
     sendOnce(client, nodeid)
 
     i = 0
-    attempts = 1
+    attempts = 0
     while not gotResponse:
         if i >= 30:
-            print(f"{Fore.LIGHTRED_EX}Timed out, retrying... (attempt #{attempts}){Fore.RESET}")
+            attempts += 1
+            if attempts > maxattempts:
+                errormsg = f"\n{Fore.LIGHTRED_EX}Timed out... Reached max attempts ({maxattempts}).\n{Fore.RESET}"
+                exitscript()
+            print(f"{Fore.LIGHTRED_EX}Timed out, retrying... (attempt {attempts}/{maxattempts}){Fore.RESET}")
             if action == "set" or action == "del":
                 sendOnce(client, nodeid, index=int(channelnum))
             else:
                 sendOnce(client, nodeid)
-            attempts += 1
+
             i = 0
         time.sleep(1)
         i +=1
