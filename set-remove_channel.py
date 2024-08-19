@@ -52,10 +52,11 @@ def exitscript():
 
 requestIds = []
 maxattempts = 25
+timeout = 30
 via = ""
 errormsg = ""
 gotResponse = False
-helptext = f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry up to 25 times until it succeeds (configurable in argument mode).\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTRED_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTRED_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script requires installation of the Meshtastic CLI (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/software/python/cli/installation/{Fore.RESET}).\n"""
+helptext = f"""\nThis is a script to change settings on a remote node that cannot be easily changed via app or CLI. To change a Meshtastic setting, the apps and CLI send a request for the current settings to the remote node via the admin channel and wait for a response. For most settings, this is fine, but for some this doesn't work reliably or at all. Remotely changing a channel, for example, requires receiving multiple packets from the remote node and then sending multiple packets back - due to the architecture of Meshtastic, this is not reliable. Enabling TX requires the remote node to send its current LoRa settings - which it can't do with TX off.\nThis script skips getting the settings from the remote node, and will retry every 30 seconds (configurable in argument mode) up to 25 times (configurable in argument mode) or until it succeeds.\nRequires admin access to the remote node (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}).\n*** {Fore.LIGHTRED_EX}CAREFUL! Don't overwrite/delete admin channel!{Fore.RESET} ***{Fore.LIGHTRED_EX}\nLeave channel list contiguous!{Fore.RESET} Deleting middle channels may lead to unexpected behaviors.\nThis script requires installation of the Meshtastic CLI (see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/software/python/cli/installation/{Fore.RESET}).\n"""
 
 if len(sys.argv) == 1: #are there any arguments? if not, use prompts
         print(f"""\nConnection method to local node:
@@ -219,7 +220,9 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
                     while not LoraSettings['bandwidth'] or not LoraSettings['spread_factor'] or not LoraSettings['coding_rate']:
                         print(f"When {Fore.LIGHTBLUE_EX}preset{Fore.RESET} is disabled, {Fore.LIGHTBLUE_EX}bandwidth{Fore.RESET}, {Fore.LIGHTBLUE_EX}spread factor{Fore.RESET} and {Fore.LIGHTBLUE_EX}coding rate{Fore.RESET} are required.")
                         LoraSettings['bandwidth'] = input("Bandwidth: ")
-                        LoraSettings['spread_factor'] = input("Spread factor: ")
+                        print(f"For spread factor, enter the numerator. For example, for {Fore.LIGHTBLUE_EX}11/2048{Fore.RESET}, enter {Fore.LIGHTBLUE_EX}11{Fore.RESET}.")
+                        LoraSettings['spread_factor'] = input("Spread factor (SF): ")
+                        print(f"For coding rate, enter the denominator. For example, for {Fore.LIGHTBLUE_EX}5/8{Fore.RESET}, enter {Fore.LIGHTBLUE_EX}5{Fore.RESET}.")
                         LoraSettings['coding_rate'] = input("Coding rate: ")
                         if LoraSettings['bandwidth'] and LoraSettings['spread_factor'] and LoraSettings['coding_rate']: break
                         i2 += 1
@@ -325,11 +328,18 @@ else:
         default=25,
     )
     options.add_argument(
+        "--timeout",
+        metavar="#",
+        help=f"Timeout before retrying. Default: {Fore.LIGHTBLUE_EX}30{Fore.RESET} seconds. Configurable via argument only.",
+        default=30,
+    )
+    options.add_argument(
         "--confirm",
         help=f"Confirm before sending command. Will display name of remote node if present in nodeDB. Default: off in argument mode. Always on in prompt mode.",
         default=False,
         action='store_true'
     )
+
 
     action = parser.add_argument_group('Command', 'What command are we sending? Choose one [REQUIRED].')
     act = action.add_mutually_exclusive_group()
@@ -406,12 +416,12 @@ else:
     )
     loraset.add_argument(
         "--spread",
-        help="LoRa spread factor. REQUIRED if not using LoRa preset.",
+        help=f"LoRa spread factor (SF) numerator. For example, for {Fore.LIGHTBLUE_EX}11/2048{Fore.RESET}, enter {Fore.LIGHTBLUE_EX}11{Fore.RESET}. REQUIRED if not using LoRa preset.",
         default="",
     )
     loraset.add_argument(
         "--codingrate",
-        help="LoRa coding rate. REQUIRED if not using LoRa preset.",
+        help=f"LoRa coding rate denominator. For example, for {Fore.LIGHTBLUE_EX}5/8{Fore.RESET}, enter {Fore.LIGHTBLUE_EX}5{Fore.RESET}. REQUIRED if not using LoRa preset.",
         default="",
     )
     loraset.add_argument(
@@ -495,6 +505,7 @@ else:
                     i += 1
                     errormsg += f"{i}. Channel number must be an integer (whole number).\n"
     maxattempts = int(args.attempts)
+    timeout = int(args.timeout)
     if args.tx:
         if not args.region:
             i += 1
@@ -594,7 +605,7 @@ else:
 
 
 if len(sys.argv) == 1 or args.confirm: #in prompt mode, ask for confirmation.
-    print(f"Send command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({nodeName})? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
+    print(f"Send command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({Fore.LIGHTBLUE_EX}{nodeName}{Fore.RESET})? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
     i = 0
     key = "X" #initial value for keypress detector
     while key.lower() not in ("y", "n"):
@@ -611,7 +622,7 @@ if len(sys.argv) == 1 or args.confirm: #in prompt mode, ask for confirmation.
         if i == 3:
             exitscript()
 
-print(f"\nSending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({Fore.LIGHTBLUE_EX}{nodeName}{Fore.RESET}) over {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET}. Will retry up to {Fore.LIGHTBLUE_EX}{maxattempts}{Fore.RESET} times until acknowledgment is received...\n")
+print(f"\nSending \"{Fore.LIGHTBLUE_EX}{readableaction}{Fore.RESET}\" command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({Fore.LIGHTBLUE_EX}{nodeName}{Fore.RESET}) over {Fore.LIGHTBLUE_EX}{readablemethod}{Fore.RESET}. Will retry every {Fore.LIGHTBLUE_EX}{timeout}{Fore.RESET} seconds up to {Fore.LIGHTBLUE_EX}{maxattempts}{Fore.RESET} times or until acknowledgment is received...\n")
 
 if action == "set": #we're adding/setting a channel
     def build_command(index=int(channelnum), role=channel_pb2.Channel.Role.SECONDARY, name=channelname, psk="base64:" + channelpsk):
@@ -644,8 +655,8 @@ elif action == "tx": #we're enabling tx
         if LoraSettings['use_preset']: command.use_preset = LoraSettings['use_preset']
         if LoraSettings['modem_preset']: command.modem_preset = config_pb2.Config.LoRaConfig.ModemPreset.Value(LoraSettings['modem_preset'])
         if LoraSettings.get('bandwidth'): command.bandwidth = int(LoraSettings['bandwidth'])
-        if LoraSettings.get('spread_factor'): command.spread_factor = int(LoraSettings['spread_factor']) #should this be a string?
-        if LoraSettings.get('coding_rate'): command.coding_rate = int(LoraSettings['coding_rate']) #should this be a string?
+        if LoraSettings.get('spread_factor'): command.spread_factor = int(LoraSettings['spread_factor'])
+        if LoraSettings.get('coding_rate'): command.coding_rate = int(LoraSettings['coding_rate'])
         if LoraSettings['frequency_offset']: command.frequency_offset = float(LoraSettings['frequency_offset'])
         if LoraSettings['hop_limit']: command.hop_limit = int(LoraSettings['hop_limit'])
         if LoraSettings['tx_power']: command.tx_power = int(LoraSettings['tx_power'])
@@ -691,15 +702,15 @@ def onReceive(packet, interface):
                     else:
                         print(f"{Fore.GREEN}Received acknowledgement:{Fore.RESET} {printable_packet(packet)}")
                         gotResponse = True
-                        print(f"\n***************    {Fore.GREEN}SUCCESS{Fore.RESET}    ***************")
-                        print(f"*** Received acknowledgement of channel {Fore.LIGHTBLUE_EX}{channelnum}{Fore.RESET} ***")
-                        print(f"************** Took {Fore.LIGHTBLUE_EX}{attempts}{Fore.RESET} attempts **************")
+                        print(f"***   {Fore.GREEN}SUCCESS!{Fore.RESET}   ***")
+                        print(f"*** Received acknowledgement of command! ***")
+                        print(f"*********** Took {Fore.LIGHTBLUE_EX}{attempts}{Fore.RESET} attempts ***********")
                 else:
                     print(f"{Fore.LIGHTRED_EX}Unexpected response:{Fore.RESET} {printable_packet(packet)}")
                     #print(f"*** {Fore.LIGHTRED_EX}THIS IS PROBABLY AN ERROR{Fore.RESET} ***")
                     if packet['decoded']['routing']['errorReason'] == "NO_CHANNEL": print(f"`Error: NO_CHANNEL` indicates that you do not have an admin channel in common with the remote node.\nFor more information, see {Fore.LIGHTBLUE_EX}https://meshtastic.org/docs/configuration/remote-admin/{Fore.RESET}")
                     if packet['decoded']['routing']['errorReason'] == "MAX_RETRANSMIT":
-                        print(f"`Error: MAX_RETRANSMIT` Is a nonfatal error that is triggered when no packet relay or acknowledgement is received. It indicates that no other nodes are in range.")
+                        print(f"`Error: MAX_RETRANSMIT` Is a nonfatal error that is often triggered when no packet relay or acknowledgement is received. It indicates that no other nodes are in range. There may be other causes of this error. We should really figure this out.")
                     else:
                         gotResponse = True
             #else:
@@ -762,12 +773,12 @@ if __name__ == "__main__":
     i = 0
     attempts = 0
     while not gotResponse:
-        if i >= 30:
+        if i >= timeout:
             attempts += 1
             if attempts > maxattempts:
                 errormsg = f"\n{Fore.LIGHTRED_EX}Timed out... Reached max attempts ({maxattempts}).\n{Fore.RESET}"
                 exitscript()
-            print(f"{Fore.LIGHTRED_EX}Timed out, retrying... (attempt {attempts}/{maxattempts}){Fore.RESET}")
+            print(f"{Fore.LIGHTRED_EX}Timed out ({timeout} sec), retrying... (attempt {attempts}/{maxattempts}){Fore.RESET}")
             if action == "set" or action == "del":
                 sendOnce(client, nodeid, index=int(channelnum))
             else:
