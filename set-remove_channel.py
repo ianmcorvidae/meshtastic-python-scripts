@@ -38,16 +38,25 @@ def keypress(): #input single character, cross-platform
         return char
 
 def exitscript():
-    print(f"{errormsg}{Fore.LIGHTRED_EX}Quitting...{Fore.RESET}")
+    print(f"\t {errormsg}{Fore.LIGHTRED_EX}Quitting.{Fore.RESET}", end=" ")
+    confirmExit = False
     try:
         args
     except:
-        print(f"\n{Fore.LIGHTBLUE_EX}Press any key to exit...{Fore.RESET}")
-        keypress()
+        confirmExit = True #if no arguments, confirm exit to prevent window from vanishing unexpectedly
     try:
-        client.close()
+        args.confirm
+    except:
+        confirmExit = True #if user activated "confirm" in argument mode, confirm exit
+    try:
+        client.close() #if client is running, close it
     except:
         ""
+    if confirmExit == True:
+        print(f"{Fore.LIGHTBLUE_EX}Press any key to exit...{Fore.RESET}")
+        keypress()
+    else:
+        print()
     quit()
 
 requestIds = []
@@ -270,26 +279,6 @@ if len(sys.argv) == 1: #are there any arguments? if not, use prompts
 
             LoraSettings['ignore_incoming'] = input(f"Ignore list. Up to three comma delineated nodeID's. Example: `{Fore.LIGHTBLUE_EX}!nodeid01,!nodeid02,!nodeid03{Fore.RESET}` ({Fore.LIGHTBLUE_EX}ENTER{Fore.RESET} to skip): ")
 
-        try:
-            print("\n"+', '.join(f'{Fore.LIGHTBLUE_EX}{key}{Fore.RESET}: {value if value != "" else "default"}' for key, value in LoraSettings.items()))
-        except:
-            ""
-        """print(f"Send command? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
-        i = 0
-        key = "X" #initial value for keypress detector
-        while key.lower() not in ("y", "n"):
-            key = keypress()
-            i += 1
-            if key.lower() == "y":
-                break
-            elif key.lower() == "n":
-                exitscript()
-            elif key == "\x1b": #esc key
-                    quit()
-            else:
-                print(f"{Fore.LIGHTRED_EX}You must choose y or n...{Fore.RESET}")
-            if i == 3:
-                exitscript()"""
 else:
     #argument mode
     ### Add arguments to parse
@@ -602,7 +591,10 @@ else:
     nodeName = f'{Fore.LIGHTRED_EX}node ID not in nodeDB{Fore.RESET}'
 
 
-
+try:
+    print("\nSettings: ["+', '.join(f'{key}: {Fore.LIGHTBLUE_EX}{value if value != "" else "default"}{Fore.RESET}' for key, value in LoraSettings.items())+"]")
+except:
+    ""
 
 if len(sys.argv) == 1 or args.confirm: #in prompt mode, ask for confirmation.
     print(f"Send command to {Fore.LIGHTBLUE_EX}{nodeid}{Fore.RESET} ({Fore.LIGHTBLUE_EX}{nodeName}{Fore.RESET})? ({Fore.LIGHTBLUE_EX}y{Fore.RESET}/{Fore.LIGHTBLUE_EX}n{Fore.RESET})")
@@ -748,25 +740,6 @@ def sendOnce(client, nodeid, *args, **kwargs):
 if __name__ == "__main__":
 
     pub.subscribe(onReceive, "meshtastic.receive")
-    
-    """ if len(via) > 0:
-        if method == "tcp":
-            client = TCPInterface(via)
-        elif method == "ble":
-            client = BLEInterface(via)
-        else:
-            client = SerialInterface(via)
-    else:
-        client = SerialInterface()
-        if client.devPath is None:
-            client = TCPInterface("localhost")
-
-    for key, value in client.nodes.items():
-        if key == nodeid:
-            long_name = value.get('user', {}).get('longName', 'node name not found in nodeDB')
-            break
-    else:
-        long_name = 'node ID not in nodeDB'"""
 
     sendOnce(client, nodeid)
 
@@ -788,10 +761,4 @@ if __name__ == "__main__":
         time.sleep(1)
         i +=1
 
-    try:
-        args
-    except:
-        print(f"\n{Fore.LIGHTBLUE_EX}Press any key to exit...{Fore.RESET}")
-        keypress()
-
-    client.close()
+    exitscript()
