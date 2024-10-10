@@ -75,7 +75,6 @@ interface.sendData(
         destinationId=args.nodeid,
         portNum=portnums_pb2.PortNum.TELEMETRY_APP,
         wantResponse=True,
-        wantAck=True,
         onResponse=onresp,
     )
 
