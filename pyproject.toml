@@ -7,11 +7,13 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.13"
-meshtastic = "^2.3.12"
+python = ">=3.10,<3.13"
+meshtastic = {extras = ["cli"], version = "^2.6.2"}
 paho-mqtt = "^2.1.0"
 cryptography = "^42.0.8"
 bitstring = "^4.2.3"
+networkx = "^3.4.2"
+pydot = "^3.0.4"
 
 
 [build-system]
